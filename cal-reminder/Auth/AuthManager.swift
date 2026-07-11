@@ -58,8 +58,9 @@ actor AuthManager: AuthManaging {
         let verifier = PKCE.generateCodeVerifier()
         let challenge = PKCE.codeChallenge(for: verifier)
 
+        let clientID = config.clientID
         let (code, redirectURI) = try await authorizationCodeProvider.requestAuthorizationCode { redirectURI in
-            Self.authorizationURL(clientID: config.clientID, redirectURI: redirectURI, codeChallenge: challenge)
+            Self.authorizationURL(clientID: clientID, redirectURI: redirectURI, codeChallenge: challenge)
         }
 
         let tokens = try await exchangeCodeForTokens(code: code, verifier: verifier, redirectURI: redirectURI)

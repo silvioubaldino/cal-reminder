@@ -10,7 +10,7 @@ protocol AuthorizationCodeProviding {
     /// carrying `code`. Returns the code together with the exact `redirectURI` used
     /// (the token exchange must send back the same value).
     func requestAuthorizationCode(
-        buildAuthorizationURL: (_ redirectURI: String) -> URL
+        buildAuthorizationURL: @escaping (_ redirectURI: String) -> URL
     ) async throws -> (code: String, redirectURI: String)
 }
 
@@ -22,75 +22,65 @@ final class LoopbackAuthorizationCodeProvider: AuthorizationCodeProviding {
     }
 
     func requestAuthorizationCode(
-        buildAuthorizationURL: (_ redirectURI: String) -> URL
+        buildAuthorizationURL: @escaping (_ redirectURI: String) -> URL
     ) async throws -> (code: String, redirectURI: String) {
         let listener = try NWListener(using: .tcp, on: .any)
 
-        let port = try await Self.waitForReadyPort(listener)
-        let redirectURI = "http://127.0.0.1:\(port)/"
-        let url = buildAuthorizationURL(redirectURI)
-
-        await MainActor.run {
-            NSWorkspace.shared.open(url)
-        }
-
-        let code = try await Self.waitForAuthorizationCode(listener)
-        return (code, redirectURI)
-    }
-
-    private static func waitForReadyPort(_ listener: NWListener) async throws -> UInt16 {
-        try await withCheckedThrowingContinuation { continuation in
+        // The listener must be started exactly once, with `newConnectionHandler` already
+        // set (otherwise Google's redirect connection is dropped). We can't know the
+        // ephemeral port until `.ready`, so the browser is opened from the state handler
+        // once the port — and thus the redirectURI — is known.
+        return try await withCheckedThrowingContinuation { continuation in
             var resumed = false
-            listener.stateUpdateHandler = { state in
+            var redirectURI = ""
+
+            func finish(_ result: Result<(code: String, redirectURI: String), Error>) {
                 guard !resumed else { return }
+                resumed = true
+                listener.cancel()
+                continuation.resume(with: result)
+            }
+
+            listener.newConnectionHandler = { connection in
+                connection.start(queue: .main)
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, error in
+                    if let error {
+                        connection.cancel()
+                        finish(.failure(error))
+                        return
+                    }
+                    guard let data, let request = String(data: data, encoding: .utf8),
+                          let code = Self.extractCode(from: request) else {
+                        connection.cancel()
+                        finish(.failure(ProviderError(description: "No authorization code in callback")))
+                        return
+                    }
+                    connection.send(content: Self.htmlResponse(), completion: .contentProcessed { _ in
+                        connection.cancel()
+                        finish(.success((code: code, redirectURI: redirectURI)))
+                    })
+                }
+            }
+
+            listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
                     guard let port = listener.port?.rawValue else {
-                        resumed = true
-                        continuation.resume(throwing: ProviderError(description: "Loopback listener has no assigned port"))
+                        finish(.failure(ProviderError(description: "Loopback listener has no assigned port")))
                         return
                     }
-                    resumed = true
-                    continuation.resume(returning: port)
+                    redirectURI = "http://127.0.0.1:\(port)/"
+                    let url = buildAuthorizationURL(redirectURI)
+                    DispatchQueue.main.async {
+                        NSWorkspace.shared.open(url)
+                    }
                 case .failed(let error):
-                    resumed = true
-                    continuation.resume(throwing: error)
+                    finish(.failure(error))
                 default:
                     break
                 }
             }
-            listener.start(queue: .main)
-        }
-    }
 
-    private static func waitForAuthorizationCode(_ listener: NWListener) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            var resumed = false
-            listener.newConnectionHandler = { connection in
-                connection.start(queue: .main)
-                connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, error in
-                    defer {
-                        connection.cancel()
-                        listener.cancel()
-                    }
-                    guard !resumed else { return }
-                    if let error {
-                        resumed = true
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    guard let data, let request = String(data: data, encoding: .utf8),
-                          let code = extractCode(from: request) else {
-                        resumed = true
-                        continuation.resume(throwing: ProviderError(description: "No authorization code in callback"))
-                        return
-                    }
-                    connection.send(content: htmlResponse(), completion: .contentProcessed { _ in
-                        resumed = true
-                        continuation.resume(returning: code)
-                    })
-                }
-            }
             listener.start(queue: .main)
         }
     }
