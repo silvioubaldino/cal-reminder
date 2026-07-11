@@ -18,14 +18,15 @@ related: [GLO]
 | ID | Requirement | Priority | Acceptance criterion |
 |----|-------------|----------|----------------------|
 | RF-01 | Connect to Google Calendar (read-only) via OAuth, once | Must | The user authorizes once in the browser; the app stays connected across restarts without re-authorizing |
-| RF-02 | Read timed Events from the primary calendar | Must | Events with a start time are read; all-day Events are ignored (RN-01) |
+| RF-02 | Read timed Events from each selected Calendar | Must | Events with a start time are read from every selected Calendar (RF-10); all-day Events are ignored (RN-01) |
 | RF-03 | Resolve each Event's effective popup Reminders | Must | For each Event, the app derives its Reminders from `overrides` or the calendar defaults, keeping only `popup` (RN-04) |
 | RF-04 | Fly the airplane + banner Overlay at each Reminder time | Must | At `Event start − Reminder minutes`, an airplane pulling a banner slides across the screen over all windows (RN-02) |
 | RF-05 | The banner shows the Event and time | Must | The banner text reads `<Title> at HH:MM (in X min)` |
-| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including the connected account's email), toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, choose the Banner's color, and quit |
+| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including the connected account's email), toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, choose the Banner's color, choose which Calendars to be alerted on (RF-10), and quit |
 | RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts, applies from the next animation on, and the Airplane crosses any screen size at the same visual speed |
 | RF-08 | Choose the Banner's color | Must | The menu bar offers a set of Banner color presets; the selection persists across restarts and applies from the next animation on |
 | RF-09 | Skip a playing Reminder animation | Should | While the airplane + banner Overlay is flying, a click anywhere on the screen accelerates it to cover the remaining distance in ~1.5s instead of blocking the click through |
+| RF-10 | Choose which Calendars to be alerted on | Should | The menu bar lists every Calendar in the connected account with a multi-select control; only selected Calendars generate Triggers; the selection persists across restarts and applies from the next Poll on. Default when the user has not chosen: all Calendars |
 
 ## Non-functional (RNF)
 | ID | Category | Requirement | Target |
@@ -40,13 +41,13 @@ related: [GLO]
 ## Business rules
 - RN-01: Only timed Events generate Triggers; all-day Events are ignored.
 - RN-02: A Trigger fires at `Event start − Reminder minutes`, one per popup Reminder of the Event.
-- RN-03: The same Reminder never fires twice (dedupe by `eventId#minutes`).
+- RN-03: The same Reminder never fires twice (dedupe by `calendarId#eventId#minutes`).
 - RN-04: If `reminders.useDefault` is true, use the calendar's default Reminders; otherwise use `reminders.overrides`, keeping only `method == popup`.
 - RN-05: Overlapping Triggers are queued — one animation plays at a time (FIFO).
 
 ## MVP scope
-- **In:** Google OAuth connect (read-only, including the account's email for display) with Keychain-stored token; reading timed Events from the primary calendar; resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status incl. connected email, on/off, test, reconnect, Flight Speed, Banner color, quit); queueing overlapping animations.
-- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed and Banner color presets (e.g. custom colors, banner size); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
+- **In:** Google OAuth connect (read-only, including the account's email for display) with Keychain-stored token; reading timed Events from the selected Calendars of the connected account; choosing which Calendars to be alerted on (RF-10); resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status incl. connected email, on/off, test, reconnect, Flight Speed, Banner color, Calendar selection, quit); queueing overlapping animations.
+- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed, Banner color, and Calendar selection presets (e.g. custom colors, banner size); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
 
 ---
 
@@ -61,6 +62,7 @@ ambiguity turns into a bug.
 
 | Term (EN) | Definition | Synonyms to avoid |
 |-----------|------------|-------------------|
+| Calendar | _A Google Calendar in the connected account (the `primary` one or a secondary/subscribed one). The user selects which Calendars generate Triggers (RF-10)._ | "agenda", "list" |
 | Event | _A Google Calendar entry with a start time (timed); all-day entries are out of scope._ | "meeting", "appointment" |
 | Reminder | _A `popup` notification configured on an Event, expressed as minutes before its start._ | "notification", "alert" |
 | Trigger | _The computed moment to fire the animation: `Event start − Reminder minutes`._ | "alarm", "job" |
