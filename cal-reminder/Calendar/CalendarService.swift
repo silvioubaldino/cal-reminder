@@ -22,7 +22,7 @@ final class CalendarService: CalendarServicing {
 
     func poll() async throws -> [Trigger] {
         let now = clock()
-        let (events, nextSyncToken) = try await api.listEvents(
+        let (events, nextSyncToken, responseDefaults) = try await api.listEvents(
             timeMin: now,
             timeMax: now.addingTimeInterval(Self.pollWindow),
             syncToken: syncToken
@@ -30,15 +30,21 @@ final class CalendarService: CalendarServicing {
         if let nextSyncToken {
             syncToken = nextSyncToken
         }
-
-        let defaults = try await defaultReminders()
+        // The calendar's default reminders arrive inline on every response; remember the
+        // last non-nil value so resolution keeps working if a response ever omits them.
+        if let responseDefaults {
+            cachedDefaultReminders = responseDefaults
+        }
+        let defaults = cachedDefaultReminders ?? []
 
         return events.flatMap { event -> [Trigger] in
             guard let startDate = Self.parseDate(event.start.dateTime) else {
+                print("[poll] skip '\(event.summary ?? "")' — no dateTime (all-day?) start=\(String(describing: event.start.dateTime))")
                 return [] // all-day Event: no dateTime (RN-01)
             }
 
             let minutesList = ReminderResolver.popupReminderMinutes(for: event, calendarDefaults: defaults)
+            print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
             return minutesList.map { minutes in
                 Trigger(
                     id: "\(event.id)#\(minutes)",
@@ -49,15 +55,6 @@ final class CalendarService: CalendarServicing {
                 )
             }
         }
-    }
-
-    private func defaultReminders() async throws -> [GoogleCalendarDefaultReminder] {
-        if let cachedDefaultReminders {
-            return cachedDefaultReminders
-        }
-        let defaults = try await api.calendarDefaultReminders()
-        cachedDefaultReminders = defaults
-        return defaults
     }
 
     private static func parseDate(_ string: String?) -> Date? {

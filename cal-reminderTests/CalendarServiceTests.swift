@@ -4,16 +4,12 @@ import XCTest
 private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     var events: [GoogleEvent] = []
     var nextSyncToken: String?
-    var defaultReminders: [GoogleCalendarDefaultReminder] = []
+    var defaultReminders: [GoogleCalendarDefaultReminder]? = []
     private(set) var receivedSyncTokens: [String?] = []
 
-    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?) {
+    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?) {
         receivedSyncTokens.append(syncToken)
-        return (events, nextSyncToken)
-    }
-
-    func calendarDefaultReminders() async throws -> [GoogleCalendarDefaultReminder] {
-        defaultReminders
+        return (events, nextSyncToken, defaultReminders)
     }
 }
 
@@ -130,7 +126,7 @@ final class CalendarServiceTests: XCTestCase {
         XCTAssertEqual(api.receivedSyncTokens, [nil, "token-abc"])
     }
 
-    func test_cachesCalendarDefaultRemindersAcrossPolls() async throws {
+    func test_remembersDefaultRemindersWhenResponseOmitsThem() async throws {
         // Arrange
         let api = StubGoogleCalendarAPI()
         api.defaultReminders = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
@@ -138,7 +134,7 @@ final class CalendarServiceTests: XCTestCase {
 
         // Act
         _ = try await service.poll()
-        api.defaultReminders = [] // if the service re-fetched, this would change resolution
+        api.defaultReminders = nil // a response without defaults must not drop the last known
         api.events = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(600))]
         let triggers = try await service.poll()
 
