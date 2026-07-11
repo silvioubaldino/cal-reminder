@@ -1,7 +1,7 @@
 ---
 id: SPEC-003
 type: spec
-status: draft
+status: done
 updated: 2026-07-11
 parents: [AYD-001]
 related: [GLO]
@@ -68,8 +68,9 @@ handles on/off, test, reconnect, quit.
 - `cal-reminder/Scheduler/Scheduler.swift`
 - `cal-reminder/App/AppState.swift`
 - `cal-reminder/App/AppCoordinator.swift`
-- `cal-reminder/MenuBar/MenuBarController.swift`
 - `cal-reminder/App/PollLoop.swift`
+- `cal-reminder/App/AppDelegate.swift` (composition root)
+- `cal-reminder/MenuBar/StatusMenuController.swift` (extended, not a new `MenuBarController` — SPEC-004 already built this as the one `NSStatusItem` menu owner)
 - `cal-reminderTests/SchedulerTests.swift`
 - `cal-reminderTests/AppCoordinatorTests.swift`
 
@@ -78,8 +79,8 @@ handles on/off, test, reconnect, quit.
 - **Unit:** dedupe set add/skip; re-arm on changed fireDate; enabled gate blocks `onFire`.
 
 ## Checklist
-- [ ] Fires within <5 s of fireDate (injected-clock test)
-- [ ] Same id never fires twice
-- [ ] Wake → re-poll + re-arm, past Triggers pruned
-- [ ] Pause/Resume gates all firing
-- [ ] Menu shows status + next Trigger; reconnect/quit work end to end
+- [x] Fires within <5 s of fireDate (injected-clock test)
+- [x] Same id never fires twice
+- [x] Wake → re-poll + re-arm, past Triggers pruned
+- [x] Pause/Resume gates all firing
+- [x] Menu shows status + next Trigger; reconnect/quit work end to end

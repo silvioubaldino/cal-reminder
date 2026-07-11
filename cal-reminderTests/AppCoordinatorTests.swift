@@ -1,0 +1,168 @@
+import XCTest
+@testable import cal_reminder
+
+private final class FakeAuthManaging: AuthManaging {
+    var isConnected = false
+    var connectError: Error?
+    private(set) var connectCallCount = 0
+
+    func connect() async throws {
+        connectCallCount += 1
+        if let connectError { throw connectError }
+        isConnected = true
+    }
+
+    func accessToken() async throws -> String { "token" }
+
+    func authorizedRequest(_ makeRequest: (_ accessToken: String) -> URLRequest) async throws -> (Data, HTTPURLResponse) {
+        fatalError("not exercised by AppCoordinatorTests")
+    }
+}
+
+private final class FakeCalendarServicing: CalendarServicing {
+    var triggers: [Trigger] = []
+    var error: Error?
+    private(set) var pollCallCount = 0
+
+    func poll() async throws -> [Trigger] {
+        pollCallCount += 1
+        if let error { throw error }
+        return triggers
+    }
+}
+
+private final class FakeScheduler: Scheduling {
+    private(set) var scheduledTriggers: [[Trigger]] = []
+    private(set) var enabledCalls: [Bool] = []
+    private(set) var cancelAllCallCount = 0
+
+    func schedule(_ triggers: [Trigger]) async {
+        scheduledTriggers.append(triggers)
+    }
+
+    func setEnabled(_ enabled: Bool) async {
+        enabledCalls.append(enabled)
+    }
+
+    func cancelAll() async {
+        cancelAllCallCount += 1
+    }
+}
+
+private actor NoOpAnimator: OverlayAnimating {
+    func animate(text: String) async {}
+}
+
+@MainActor
+final class AppCoordinatorTests: XCTestCase {
+    private func trigger(id: String, minutesFromNow: TimeInterval) -> Trigger {
+        let start = Date().addingTimeInterval(minutesFromNow * 60)
+        return Trigger(id: id, eventTitle: "Standup", startDate: start, fireDate: start, minutesBefore: 0)
+    }
+
+    private func makeCoordinator(
+        auth: FakeAuthManaging = FakeAuthManaging(),
+        calendar: FakeCalendarServicing = FakeCalendarServicing(),
+        scheduler: FakeScheduler = FakeScheduler()
+    ) -> AppCoordinator {
+        AppCoordinator(
+            auth: auth,
+            calendar: calendar,
+            scheduler: scheduler,
+            overlay: OverlayPresenter(animator: NoOpAnimator())
+        )
+    }
+
+    func test_startReflectsAuthConnectionStatus() {
+        // Arrange
+        let auth = FakeAuthManaging()
+        auth.isConnected = true
+        let coordinator = makeCoordinator(auth: auth)
+
+        // Act
+        coordinator.start()
+
+        // Assert
+        XCTAssertTrue(coordinator.state.connected)
+    }
+
+    func test_successfulPollUpdatesStateAndForwardsToScheduler() async {
+        // Arrange
+        let calendar = FakeCalendarServicing()
+        let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
+        calendar.triggers = [upcoming]
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(calendar: calendar, scheduler: scheduler)
+
+        // Act
+        await coordinator.poll()
+
+        // Assert
+        XCTAssertTrue(coordinator.state.connected)
+        XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
+        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+    }
+
+    func test_failedPollKeepsConnectedAtAuthIsConnected() async {
+        // Arrange
+        let auth = FakeAuthManaging()
+        auth.isConnected = true
+        let calendar = FakeCalendarServicing()
+        calendar.error = URLError(.notConnectedToInternet)
+        let coordinator = makeCoordinator(auth: auth, calendar: calendar)
+
+        // Act
+        await coordinator.poll()
+
+        // Assert
+        XCTAssertTrue(coordinator.state.connected)
+    }
+
+    func test_toggleEnabledFlipsStateAndCallsScheduler() async throws {
+        // Arrange
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+        XCTAssertTrue(coordinator.state.enabled)
+
+        // Act
+        coordinator.toggleEnabled()
+
+        // Assert (state flips synchronously)
+        XCTAssertFalse(coordinator.state.enabled)
+
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(scheduler.enabledCalls, [false])
+    }
+
+    func test_reconnectCallsAuthConnectThenPolls() async throws {
+        // Arrange
+        let auth = FakeAuthManaging()
+        let calendar = FakeCalendarServicing()
+        let coordinator = makeCoordinator(auth: auth, calendar: calendar)
+
+        // Act
+        coordinator.reconnect()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(auth.connectCallCount, 1)
+        XCTAssertEqual(calendar.pollCallCount, 1)
+        XCTAssertTrue(coordinator.state.connected)
+    }
+
+    func test_wakeCancelsSchedulerBeforeRePolling() async {
+        // Arrange
+        let calendar = FakeCalendarServicing()
+        let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
+        calendar.triggers = [upcoming]
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(calendar: calendar, scheduler: scheduler)
+
+        // Act
+        await coordinator.handleWake()
+
+        // Assert
+        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+    }
+}

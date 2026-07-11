@@ -1,18 +1,29 @@
 import Cocoa
 
-/// The `NSStatusItem` menu (RF-06). M0 skeleton: only "Test animation" and "Quit" are
-/// wired; status/on-off/reconnect are placeholders until SPEC-003.
+/// The `NSStatusItem` menu (RF-06): connection status, next upcoming Trigger, Pause/Resume,
+/// test animation, Flight Speed, Reconnect Google, and Quit. `render(_:)` reflects the
+/// `AppCoordinator`'s `AppState` after every change.
 final class StatusMenuController {
     private let statusItem: NSStatusItem
     private let onTestAnimation: () -> Void
+    private let onToggleEnabled: () -> Void
+    private let onReconnect: () -> Void
     private let speedStore: FlightSpeedStoring
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
 
+    private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
+    private let nextTriggerLabel = NSMenuItem(title: "No upcoming reminders", action: nil, keyEquivalent: "")
+    private let toggleItem = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
+
     init(
         onTestAnimation: @escaping () -> Void,
+        onToggleEnabled: @escaping () -> Void = {},
+        onReconnect: @escaping () -> Void = {},
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore()
     ) {
         self.onTestAnimation = onTestAnimation
+        self.onToggleEnabled = onToggleEnabled
+        self.onReconnect = onReconnect
         self.speedStore = speedStore
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
@@ -22,16 +33,30 @@ final class StatusMenuController {
         buildMenu()
     }
 
+    /// Reflects the coordinator's `AppState` in the menu (RF-06 status + next Trigger).
+    func render(_ state: AppState) {
+        statusLabel.title = state.connected ? "Connected" : "Not connected"
+        toggleItem.title = state.enabled ? "Pause" : "Resume"
+
+        if let next = state.nextTrigger {
+            let time = DateFormatter.localizedString(from: next.startDate, dateStyle: .none, timeStyle: .short)
+            nextTriggerLabel.title = "Next: \(next.eventTitle) \(time)"
+        } else {
+            nextTriggerLabel.title = "No upcoming reminders"
+        }
+    }
+
     private func buildMenu() {
         let menu = NSMenu()
 
-        let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
+        nextTriggerLabel.isEnabled = false
+        menu.addItem(nextTriggerLabel)
         menu.addItem(.separator())
 
-        let toggleItem = NSMenuItem(title: "Enabled", action: nil, keyEquivalent: "")
-        toggleItem.isEnabled = false
+        toggleItem.action = #selector(handleToggleEnabled)
+        toggleItem.target = self
         menu.addItem(toggleItem)
 
         let testItem = NSMenuItem(
@@ -44,8 +69,12 @@ final class StatusMenuController {
 
         menu.addItem(flightSpeedMenuItem())
 
-        let reconnectItem = NSMenuItem(title: "Reconnect Google", action: nil, keyEquivalent: "")
-        reconnectItem.isEnabled = false
+        let reconnectItem = NSMenuItem(
+            title: "Reconnect Google",
+            action: #selector(handleReconnect),
+            keyEquivalent: ""
+        )
+        reconnectItem.target = self
         menu.addItem(reconnectItem)
 
         menu.addItem(.separator())
@@ -83,6 +112,14 @@ final class StatusMenuController {
 
     @objc private func handleTestAnimation() {
         onTestAnimation()
+    }
+
+    @objc private func handleToggleEnabled() {
+        onToggleEnabled()
+    }
+
+    @objc private func handleReconnect() {
+        onReconnect()
     }
 
     @objc private func handleSelectSpeed(_ sender: NSMenuItem) {
