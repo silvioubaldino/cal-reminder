@@ -22,14 +22,16 @@ related: [GLO]
 | RF-03 | Resolve each Event's effective popup Reminders | Must | For each Event, the app derives its Reminders from `overrides` or the calendar defaults, keeping only `popup` (RN-04) |
 | RF-04 | Fly the airplane + banner Overlay at each Reminder time | Must | At `Event start − Reminder minutes`, an airplane pulling a banner slides across the screen over all windows (RN-02) |
 | RF-05 | The banner shows the Event and time | Must | The banner text reads `<Title> at HH:MM (in X min)` |
-| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status, toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, and quit |
-| RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts and applies from the next animation on |
+| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including the connected account's email), toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, choose the Banner's color, and quit |
+| RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts, applies from the next animation on, and the Airplane crosses any screen size at the same visual speed |
+| RF-08 | Choose the Banner's color | Must | The menu bar offers a set of Banner color presets; the selection persists across restarts and applies from the next animation on |
+| RF-09 | Skip a playing Reminder animation | Should | While the airplane + banner Overlay is flying, a click anywhere on the screen accelerates it to cover the remaining distance in ~1.5s instead of blocking the click through |
 
 ## Non-functional (RNF)
 | ID | Category | Requirement | Target |
 |----|----------|-------------|--------|
 | RNF-01 | Footprint | Runs as a background menu bar agent | `LSUIElement` app, no Dock icon |
-| RNF-02 | Overlay behavior | The Overlay never steals focus nor blocks clicks, and appears above everything | Shows over fullscreen apps and all Spaces; clicks pass through to the window below |
+| RNF-02 | Overlay behavior | The Overlay never steals focus, and appears above everything; it is click-through except while a Reminder animation is playing, when a click skips it (RF-09) | Shows over fullscreen apps and all Spaces; clicks pass through to the window below when idle; never activates the app or takes key focus, even mid-flight |
 | RNF-03 | Precision | The Trigger fires close to the computed time | Error < 5 s from the computed fire time |
 | RNF-04 | Resilience | Tolerant to sleep/wake and network loss | Re-syncs on wake; keeps scheduled Triggers across transient network failures |
 | RNF-05 | Security | Secrets are stored securely | Tokens only in the macOS Keychain, never in plaintext on disk |
@@ -43,8 +45,8 @@ related: [GLO]
 - RN-05: Overlapping Triggers are queued — one animation plays at a time (FIFO).
 
 ## MVP scope
-- **In:** Google OAuth connect (read-only) with Keychain-stored token; reading timed Events from the primary calendar; resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status, on/off, test, reconnect, Flight Speed, quit); queueing overlapping animations.
-- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI (banner color, etc. stay hardcoded — Flight Speed is the only configurable knob); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
+- **In:** Google OAuth connect (read-only, including the account's email for display) with Keychain-stored token; reading timed Events from the primary calendar; resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status incl. connected email, on/off, test, reconnect, Flight Speed, Banner color, quit); queueing overlapping animations.
+- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed and Banner color presets (e.g. custom colors, banner size); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
 
 ---
 
@@ -62,7 +64,7 @@ ambiguity turns into a bug.
 | Event | _A Google Calendar entry with a start time (timed); all-day entries are out of scope._ | "meeting", "appointment" |
 | Reminder | _A `popup` notification configured on an Event, expressed as minutes before its start._ | "notification", "alert" |
 | Trigger | _The computed moment to fire the animation: `Event start − Reminder minutes`._ | "alarm", "job" |
-| Overlay | _The transparent, click-through, always-on-top window that draws the animation._ | "popup", "window" |
+| Overlay | _The transparent, always-on-top window that draws the animation; click-through except while flying, when a click skips it (RF-09)._ | "popup", "window" |
 | Airplane | _The little plane that flies across the Overlay pulling the banner._ | "plane sprite" |
 | Banner | _The strip pulled by the Airplane, showing the Event text._ | "faixa", "ribbon", "label" |
 | Poll | _The periodic fetch of upcoming Events from the Google Calendar API._ | "sync", "refresh" |

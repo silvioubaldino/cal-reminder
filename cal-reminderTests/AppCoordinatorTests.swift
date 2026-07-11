@@ -4,6 +4,7 @@ import XCTest
 private final class FakeAuthManaging: AuthManaging {
     var isConnected = false
     var connectError: Error?
+    var email: String? = "user@example.com"
     private(set) var connectCallCount = 0
 
     func connect() async throws {
@@ -16,6 +17,11 @@ private final class FakeAuthManaging: AuthManaging {
 
     func authorizedRequest(_ makeRequest: (_ accessToken: String) -> URLRequest) async throws -> (Data, HTTPURLResponse) {
         fatalError("not exercised by AppCoordinatorTests")
+    }
+
+    func userEmail() async throws -> String {
+        guard let email else { throw AuthError.notConnected }
+        return email
     }
 }
 
@@ -132,6 +138,21 @@ final class AppCoordinatorTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 20_000_000)
         XCTAssertEqual(scheduler.enabledCalls, [false])
+    }
+
+    func test_startFetchesConnectedUserEmail() async throws {
+        // Arrange
+        let auth = FakeAuthManaging()
+        auth.isConnected = true
+        auth.email = "user@example.com"
+        let coordinator = makeCoordinator(auth: auth)
+
+        // Act
+        coordinator.start()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Assert
+        XCTAssertEqual(coordinator.state.userEmail, "user@example.com")
     }
 
     func test_reconnectCallsAuthConnectThenPolls() async throws {

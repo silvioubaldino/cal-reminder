@@ -47,8 +47,27 @@ final class FlightSpeedStoreTests: XCTestCase {
     }
 
     func test_flightDurationOrdering() {
-        // Arrange / Act / Assert
-        XCTAssertGreaterThan(FlightSpeed.slow.flightDuration, FlightSpeed.normal.flightDuration)
-        XCTAssertGreaterThan(FlightSpeed.normal.flightDuration, FlightSpeed.fast.flightDuration)
+        // Arrange
+        let screenWidth: CGFloat = 1920
+
+        // Act / Assert
+        XCTAssertGreaterThan(
+            FlightSpeed.slow.flightDuration(forScreenWidth: screenWidth),
+            FlightSpeed.normal.flightDuration(forScreenWidth: screenWidth)
+        )
+        XCTAssertGreaterThan(
+            FlightSpeed.normal.flightDuration(forScreenWidth: screenWidth),
+            FlightSpeed.fast.flightDuration(forScreenWidth: screenWidth)
+        )
+    }
+
+    func test_flightDurationScalesWithScreenWidth() {
+        // Arrange / Act
+        let narrow = FlightSpeed.normal.flightDuration(forScreenWidth: 800)
+        let wide = FlightSpeed.normal.flightDuration(forScreenWidth: 3440) // ultrawide
+
+        // Assert: same preset takes longer, in real time, to cross a wider screen —
+        // but at the same visual (points-per-second) speed.
+        XCTAssertGreaterThan(wide, narrow)
     }
 }

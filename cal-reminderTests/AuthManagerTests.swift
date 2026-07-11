@@ -169,6 +169,26 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertEqual(String(data: data, encoding: .utf8), "success")
     }
 
+    func test_userEmail_returnsEmailFromUserInfoEndpoint() async throws {
+        // Arrange
+        let httpClient = StubHTTPClient(responses: [
+            (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200)), // accessToken()
+            (try! JSONSerialization.data(withJSONObject: ["email": "user@example.com"]), httpResponse(status: 200)) // userinfo
+        ])
+        let manager = AuthManager(
+            config: config,
+            tokenStore: FakeTokenStore(initialToken: "refresh-1"),
+            httpClient: httpClient,
+            authorizationCodeProvider: StubAuthorizationCodeProvider()
+        )
+
+        // Act
+        let email = try await manager.userEmail()
+
+        // Assert
+        XCTAssertEqual(email, "user@example.com")
+    }
+
     func test_accessToken_throwsWhenNeverConnected() async {
         // Arrange
         let manager = AuthManager(

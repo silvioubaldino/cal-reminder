@@ -3,6 +3,7 @@ import Foundation
 enum AuthError: Error {
     case notConnected
     case tokenExchangeFailed
+    case userInfoFetchFailed
 }
 
 protocol AuthManaging {
@@ -12,6 +13,8 @@ protocol AuthManaging {
     /// Builds a request with a fresh access token, sends it, and — on a 401 — refreshes
     /// the access token once and retries transparently (AYD-001 AuthManager contract).
     func authorizedRequest(_ makeRequest: (_ accessToken: String) -> URLRequest) async throws -> (Data, HTTPURLResponse)
+    /// The connected Google account's email address, shown in the menu bar (RF-06).
+    func userEmail() async throws -> String
 }
 
 actor AuthManager: AuthManaging {
@@ -25,6 +28,10 @@ actor AuthManager: AuthManaging {
             case refreshToken = "refresh_token"
             case expiresIn = "expires_in"
         }
+    }
+
+    private struct UserInfoResponse: Decodable {
+        let email: String
     }
 
     private let config: GoogleOAuthConfig
@@ -84,6 +91,16 @@ actor AuthManager: AuthManaging {
         return try await httpClient.send(makeRequest(refreshedToken))
     }
 
+    func userEmail() async throws -> String {
+        let (data, response) = try await authorizedRequest { token in
+            var request = URLRequest(url: URL(string: "https://www.googleapis.com/oauth2/v3/userinfo")!)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            return request
+        }
+        guard response.statusCode == 200 else { throw AuthError.userInfoFetchFailed }
+        return try JSONDecoder().decode(UserInfoResponse.self, from: data).email
+    }
+
     @discardableResult
     private func forceRefresh() async throws -> String {
         guard let refreshToken = tokenStore.refreshToken() else { throw AuthError.notConnected }
@@ -137,7 +154,10 @@ actor AuthManager: AuthManaging {
             URLQueryItem(name: "client_id", value: clientID),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: GoogleOAuthConfig.calendarReadOnlyScope),
+            URLQueryItem(
+                name: "scope",
+                value: "\(GoogleOAuthConfig.calendarReadOnlyScope) \(GoogleOAuthConfig.userInfoEmailScope)"
+            ),
             URLQueryItem(name: "code_challenge", value: codeChallenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "access_type", value: "offline"),

@@ -11,9 +11,14 @@ protocol OverlayAnimating {
 @MainActor
 final class DefaultOverlayAnimator: OverlayAnimating {
     private let speedStore: FlightSpeedStoring
+    private let colorStore: BannerColorStoring
 
-    init(speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore()) {
+    init(
+        speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
+        colorStore: BannerColorStoring = UserDefaultsBannerColorStore()
+    ) {
         self.speedStore = speedStore
+        self.colorStore = colorStore
     }
 
     func animate(text: String) async {
@@ -21,10 +26,16 @@ final class DefaultOverlayAnimator: OverlayAnimating {
 
         let panel = OverlayPanel(screen: screen)
         let view = AirplaneBannerView(frame: CGRect(origin: .zero, size: screen.frame.size))
+        view.setBannerColor(colorStore.bannerColor.color)
+        view.onSkipRequested = { [weak view] in view?.skipToEnd() }
         panel.contentView = view
 
         panel.orderFrontRegardless()
-        await view.animate(text: text, duration: speedStore.flightSpeed.flightDuration)
+        // Click-through by default (RNF-02); accept clicks only while this flight
+        // plays, so the user can click anywhere to skip it (RF-09).
+        panel.ignoresMouseEvents = false
+        await view.animate(text: text, speed: speedStore.flightSpeed)
+        panel.ignoresMouseEvents = true
         panel.orderOut(nil)
     }
 }

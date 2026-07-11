@@ -32,6 +32,10 @@ final class AppCoordinator {
     func start() {
         state.connected = auth.isConnected
         notify()
+        Task {
+            await refreshUserEmail()
+            notify()
+        }
         pollLoop.start()
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
@@ -53,6 +57,7 @@ final class AppCoordinator {
         Task {
             try? await auth.connect()
             state.connected = auth.isConnected
+            await refreshUserEmail(force: true)
             notify()
             await poll()
         }
@@ -79,6 +84,7 @@ final class AppCoordinator {
             await scheduler.schedule(triggers)
             state.connected = true
             state.nextTrigger = triggers.min { $0.fireDate < $1.fireDate }
+            await refreshUserEmail()
         } catch {
             state.connected = auth.isConnected
         }
@@ -89,6 +95,18 @@ final class AppCoordinator {
     func handleWake() async {
         await scheduler.cancelAll()
         await poll()
+    }
+
+    /// Fetches the connected account's email into `state.userEmail` (RF-06). Skipped
+    /// when already cached unless `force` (e.g. after a reconnect, which may switch
+    /// accounts), and cleared when not connected.
+    private func refreshUserEmail(force: Bool = false) async {
+        guard state.connected else {
+            state.userEmail = nil
+            return
+        }
+        guard force || state.userEmail == nil else { return }
+        state.userEmail = try? await auth.userEmail()
     }
 
     private func notify() {

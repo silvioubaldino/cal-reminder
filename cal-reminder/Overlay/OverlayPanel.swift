@@ -1,8 +1,9 @@
 import AppKit
 
-/// A borderless, click-through, always-on-top panel that draws the Overlay animation
-/// above every window (including fullscreen), on every Space, without stealing focus
-/// (RNF-02).
+/// A borderless, always-on-top panel that draws the Overlay animation above every
+/// window (including fullscreen), on every Space, without stealing focus (RNF-02).
+/// Click-through by default; `DefaultOverlayAnimator` flips `ignoresMouseEvents` off
+/// only while a flight is in progress, so a click can skip it (RF-09).
 final class OverlayPanel: NSPanel {
     init(screen: NSScreen) {
         super.init(

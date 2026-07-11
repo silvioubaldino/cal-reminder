@@ -13,6 +13,7 @@ struct GoogleOAuthConfig: Decodable {
     }
 
     static let calendarReadOnlyScope = "https://www.googleapis.com/auth/calendar.readonly"
+    static let userInfoEmailScope = "https://www.googleapis.com/auth/userinfo.email"
 
     enum ConfigError: Error {
         case missingConfigFile(URL)
