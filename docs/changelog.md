@@ -1,0 +1,29 @@
+---
+id: CHANGELOG
+type: changelog
+title: Changelog
+status: approved
+updated: 2026-07-11
+---
+
+# Changelog
+
+Changes to the docs (requirements, glossary, architecture, design/AYD, conventions) and
+to the app. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+**Policy**:
+
+- **Order:** most recent on top; new entries go **above** the previous ones.
+- **Unreleased:** unreleased work accrues under `## Unreleased` (always the top block),
+  with no date/version. On a release, `## Unreleased` becomes `## [dd-MM-yyyy - vX.Y.Z]`
+  and a new empty `## Unreleased` is opened above it.
+- **One line per PR:** each PR adds a **single line** summarizing what it delivers —
+  general, no implementation detail (that lives in the SPEC/TDR/PR). See CONV §B.3.
+
+## Unreleased
+
+- Filled REQ-01 (functional/non-functional requirements, business rules, MVP scope) and the glossary (Event, Reminder, Trigger, Overlay, Airplane, Banner, Poll).
+- Filled the living architecture (ARCH): container view and the app's component breakdown.
+- Migrated the original AyD into the framework as AYD-001 (airplane event reminders), the source of the design; linked to REQ-01.
+- Bootstrapped the single-part SDD docs framework (conventions, requirements/architecture skeletons, AYD/SPEC/TDR templates).
