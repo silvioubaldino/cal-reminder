@@ -1,7 +1,7 @@
 ---
 id: SPEC-001
 type: spec
-status: draft
+status: review
 updated: 2026-07-11
 parents: [AYD-001]
 related: [GLO]
@@ -72,8 +72,8 @@ animation resolves a completion that dequeues the next. Banner text via a pure f
 - **Unit:** `bannerText` formatting (padding, minute rounding, edge `in 0 min`); queue actor keeps FIFO under concurrent enqueue.
 
 ## Checklist
-- [ ] Panel appears over a fullscreen app on all Spaces
-- [ ] Clicks pass through; Overlay never becomes key
-- [ ] Banner text matches RF-05 format
-- [ ] FIFO queue: no two animations overlap
-- [ ] "Test animation" menu item plays a sample
+- [ ] Panel appears over a fullscreen app on all Spaces (manual)
+- [ ] Clicks pass through; Overlay never becomes key (manual)
+- [x] Banner text matches RF-05 format (`BannerTextTests`)
+- [x] FIFO queue: no two animations overlap (`OverlayQueueTests`)
+- [ ] "Test animation" menu item plays a sample (manual — app launches and the menu action is wired; visual confirmation pending)

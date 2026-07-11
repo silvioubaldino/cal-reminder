@@ -1,0 +1,58 @@
+name: cal-reminder
+options:
+  bundleIdPrefix: com.silvioubaldino
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  cal-reminder:
+    type: application
+    platform: macOS
+    sources:
+      - path: cal-reminder
+    info:
+      path: cal-reminder/App/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleDisplayName: cal-reminder
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.silvioubaldino.cal-reminder
+        ENABLE_HARDENED_RUNTIME: false
+        GENERATE_INFOPLIST_FILE: false
+
+  cal-reminderTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: cal-reminderTests
+    dependencies:
+      - target: cal-reminder
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: true
+
+schemes:
+  cal-reminder:
+    build:
+      targets:
+        cal-reminder: all
+        cal-reminderTests: [test]
+    test:
+      targets:
+        - cal-reminderTests
+    run:
+      config: Debug
