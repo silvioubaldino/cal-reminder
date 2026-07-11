@@ -1,10 +1,10 @@
 ---
 id: SPEC-002
 type: spec
-status: draft
+status: review
 updated: 2026-07-11
 parents: [AYD-001]
-related: [GLO]
+related: [GLO, TDR-001]
 ---
 
 # SPEC-002: Google auth + calendar poll → Triggers
@@ -49,14 +49,19 @@ Scenario: One Trigger per popup reminder
 ```
 
 ## How (approach)
-`AuthManager`: OAuth 2.0 Desktop/PKCE — loopback redirect (`http://127.0.0.1:<port>`),
-open the system browser, capture the code, exchange for tokens, store **refresh token** in
-Keychain (`kSecClassGenericPassword`). `accessToken()` refreshes on demand and on 401.
+`AuthManager`: OAuth 2.0 Desktop/PKCE — a loopback `NWListener` on an ephemeral port
+(`http://127.0.0.1:<port>`) opens the system browser and captures Google's redirect,
+exchanges the code for tokens, and stores the **refresh token** in Keychain
+(`kSecClassGenericPassword`). `accessToken()` returns the cached token until it expires,
+then refreshes. `authorizedRequest(_:)` builds a request with a fresh token, sends it, and
+on a `401` refreshes once and retries transparently — callers (`GoogleCalendarAPI`) go
+through this method instead of handling 401 themselves. Client credentials come from a
+local JSON file, never committed (TDR-001).
 `CalendarService.poll()`: `GET events.list` (`timeMin=now`, `timeMax=now+2h`,
 `singleEvents=true`, `syncToken` when available for incremental sync, RNF-06); decode with
 `Codable`; filter `start.dateTime` present; resolve reminders (fetch `calendarList.get`
-defaults once, cache) → map to `[Trigger]`. Boundaries (network, keychain, clock) are
-injected for tests.
+defaults once, cache) → map to `[Trigger]`. Boundaries (network, keychain, clock, browser/
+loopback) are injected for tests.
 
 ## Steps
 1. `KeychainStore` — get/set/delete the refresh token (`kSecClassGenericPassword`).
@@ -67,7 +72,11 @@ injected for tests.
 
 ## Affected files
 - `cal-reminder/Auth/KeychainStore.swift`
+- `cal-reminder/Auth/GoogleOAuthConfig.swift` (client credentials loader — see TDR-001)
+- `cal-reminder/Auth/PKCE.swift` (verifier/challenge, pure)
+- `cal-reminder/Auth/AuthorizationCodeProviding.swift` (loopback HTTP listener + browser)
 - `cal-reminder/Auth/AuthManager.swift`
+- `cal-reminder/Networking/HTTPClient.swift` (shared network boundary)
 - `cal-reminder/Calendar/GoogleCalendarAPI.swift`
 - `cal-reminder/Calendar/Models.swift` (Event/Reminder DTOs)
 - `cal-reminder/Calendar/ReminderResolver.swift`
@@ -75,15 +84,18 @@ injected for tests.
 - `cal-reminderTests/ReminderResolverTests.swift`
 - `cal-reminderTests/CalendarServiceTests.swift`
 - `cal-reminderTests/AuthManagerTests.swift`
+- `cal-reminderTests/KeychainStoreTests.swift`
 
 ## Tests
 - **Acceptance:** timed-only, RN-04 resolution, one-Trigger-per-reminder, and id format → `CalendarServiceTests`/`ReminderResolverTests` with a stubbed API returning fixture JSON and a fixed clock. Auto-refresh → `AuthManagerTests` with a stubbed token endpoint (401→refresh→retry). One-time-persist verified **manually** (real browser + Keychain) plus a `KeychainStore` round-trip unit test.
 - **Unit:** PKCE challenge derivation; `syncToken` incremental vs full; `fireDate` math; DTO decoding (all-day vs timed).
 
 ## Checklist
-- [ ] Browser authorize → refresh token in Keychain; survives restart
-- [ ] 401 triggers one transparent refresh + retry
-- [ ] All-day Events ignored
-- [ ] RN-04 popup resolution (useDefault vs overrides)
-- [ ] One Trigger per popup reminder, correct id + fireDate
-- [ ] Incremental sync via syncToken
+- [ ] Browser authorize → refresh token in Keychain; survives restart (manual — no
+      "Reconnect Google" menu item yet; end-to-end wiring is SPEC-003)
+- [x] 401 triggers one transparent refresh + retry (`AuthManagerTests`)
+- [x] All-day Events ignored (`CalendarServiceTests`)
+- [x] RN-04 popup resolution (useDefault vs overrides) (`ReminderResolverTests`, `CalendarServiceTests`)
+- [x] One Trigger per popup reminder, correct id + fireDate (`CalendarServiceTests`)
+- [x] Incremental sync via syncToken (`CalendarServiceTests`)
+- [x] Refresh token round-trips through the Keychain (`KeychainStoreTests`)
