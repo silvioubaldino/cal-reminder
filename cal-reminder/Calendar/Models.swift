@@ -38,3 +38,25 @@ struct GoogleCalendarDefaultReminder: Decodable {
     let method: String
     let minutes: Int
 }
+
+/// A raw `calendarList.list` item (RF-10).
+struct GoogleCalendarListEntry: Decodable {
+    let id: String
+    let summary: String
+    let primary: Bool?
+    /// One of "owner" | "writer" | "reader" | "freeBusyReader"; only the first three can
+    /// read Event details.
+    let accessRole: String
+}
+
+struct GoogleCalendarListResponse: Decodable {
+    let items: [GoogleCalendarListEntry]
+}
+
+/// The domain view of a Calendar (GLO: Calendar), passed to the menu (RF-10). Named
+/// `CalendarInfo` — not `Calendar` — to avoid colliding with `Foundation.Calendar`.
+struct CalendarInfo: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let isPrimary: Bool
+}

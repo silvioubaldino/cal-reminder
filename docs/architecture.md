@@ -57,10 +57,10 @@ flowchart TB
 
 | Component | Responsibility | Detailed in |
 |-----------|----------------|-------------|
-| **MenuBar UI** | `NSStatusItem` menu: status, on/off, test, reconnect, quit | AYD-001 |
-| **AppCoordinator** | Wires modules together; holds `AppState` | AYD-001 |
+| **MenuBar UI** | `NSStatusItem` menu: status, on/off, test, reconnect, Flight Speed, Banner color, Calendar selection, quit | AYD-001, AYD-002 |
+| **AppCoordinator** | Wires modules together; holds `AppState`; re-Polls on Calendar-selection changes | AYD-001, AYD-002 |
 | **AuthManager** | OAuth PKCE flow + token refresh + Keychain storage | AYD-001 |
-| **CalendarService** | Poll, incremental sync, parse Events, resolve Reminders → Triggers | AYD-001 |
+| **CalendarService** | List Calendars, Poll each selected Calendar (per-Calendar sync), parse Events, resolve Reminders → Triggers | AYD-001, AYD-002 |
 | **Scheduler** | Precise local timers per Trigger + dedupe + sleep/wake handling | AYD-001 |
 | **OverlayPresenter** | `NSPanel` over all windows + animation + FIFO queue | AYD-001 |
 

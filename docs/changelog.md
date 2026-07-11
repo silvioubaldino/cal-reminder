@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-005: the menu now lists every Calendar in the connected account with a checkbox to choose which ones generate Reminders, persisted across restarts.
+- Wrote SPEC-005: implementation plan for the Calendar-selection menu (list Calendars, multi-select which to alert on, per-Calendar Poll, persisted).
+- Designed AYD-002: reading every Calendar in the connected account and letting the user pick, from the menu bar, which Calendars to be alerted on (default: all); added the Calendar glossary term and RF-10.
 - Fixed: Reminders were not being detected due to a broken API call; now reading defaults from the calendar events list.
 - Moved the flight path to the screen's top third, shrank and centered the Banner text, and made a playing Reminder animation skippable with a click (accelerates to the end in ~1.5s).
 - Made Flight Speed independent of screen size, sped up all 3 presets, drew a rope tying the Airplane to the Banner, added a configurable Banner color to the menu, and show the connected Google account's email in the menu bar status.

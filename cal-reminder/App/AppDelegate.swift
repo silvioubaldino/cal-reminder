@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenuController: StatusMenuController?
     private var coordinator: AppCoordinator?
     private let flightSpeedStore = UserDefaultsFlightSpeedStore()
+    private let calendarSelectionStore = UserDefaultsCalendarSelectionStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let overlayPresenter = OverlayPresenter(
@@ -20,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
         )
         let calendarAPI = GoogleCalendarAPI(authManager: authManager)
-        let calendarService = CalendarService(api: calendarAPI)
+        let calendarService = CalendarService(api: calendarAPI, selectionStore: calendarSelectionStore)
         let scheduler = Scheduler(onFire: { trigger in
             Task { await overlayPresenter.enqueue(trigger) }
         })
@@ -43,7 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onReconnect: { [weak coordinator] in
                 coordinator?.reconnect()
             },
-            speedStore: flightSpeedStore
+            onCalendarsChanged: { [weak coordinator] in
+                coordinator?.calendarsChanged()
+            },
+            speedStore: flightSpeedStore,
+            calendarSelectionStore: calendarSelectionStore
         )
         self.statusMenuController = statusMenuController
 
