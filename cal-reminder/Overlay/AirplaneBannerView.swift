@@ -4,7 +4,7 @@ import QuartzCore
 /// Draws the Airplane pulling the Banner and slides it across the view's width.
 final class AirplaneBannerView: NSView {
     private let containerLayer = CALayer()
-    private let airplaneLayer = CATextLayer()
+    private let airplaneLayer = CALayer()
     private let bannerLayer = CALayer()
     private let bannerTextLayer = CATextLayer()
 
@@ -34,16 +34,23 @@ final class AirplaneBannerView: NSView {
         containerLayer.bounds = CGRect(origin: .zero, size: containerSize)
         containerLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
 
-        airplaneLayer.string = "✈️"
-        airplaneLayer.fontSize = 40
-        airplaneLayer.alignmentMode = .center
-        airplaneLayer.frame = CGRect(origin: .zero, size: Self.airplaneSize)
+        // Flight moves left-to-right, so the Airplane leads (trailing edge = right)
+        // and the Banner trails behind it, pulled from the left.
+        if let image = NSImage(named: "airplane") {
+            airplaneLayer.contents = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+        airplaneLayer.frame = CGRect(
+            x: Self.bannerSize.width,
+            y: (containerSize.height - Self.airplaneSize.height) / 2,
+            width: Self.airplaneSize.width,
+            height: Self.airplaneSize.height
+        )
         airplaneLayer.contentsScale = scale
 
         bannerLayer.backgroundColor = NSColor.systemPink.cgColor
         bannerLayer.cornerRadius = 8
         bannerLayer.frame = CGRect(
-            x: Self.airplaneSize.width,
+            x: 0,
             y: (containerSize.height - Self.bannerSize.height) / 2,
             width: Self.bannerSize.width,
             height: Self.bannerSize.height
