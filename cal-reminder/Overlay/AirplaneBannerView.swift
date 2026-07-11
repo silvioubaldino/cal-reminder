@@ -8,7 +8,6 @@ final class AirplaneBannerView: NSView {
     private let bannerLayer = CALayer()
     private let bannerTextLayer = CATextLayer()
 
-    private static let flightDuration: CFTimeInterval = 6.0
     private static let bannerSize = CGSize(width: 420, height: 60)
     private static let airplaneSize = CGSize(width: 60, height: 60)
 
@@ -69,8 +68,9 @@ final class AirplaneBannerView: NSView {
     }
 
     /// Slides the Airplane + Banner left-to-right across the view, updating the banner
-    /// text, and returns once the animation completes.
-    func animate(text: String) async {
+    /// text, and returns once the animation completes. `duration` is the Flight Speed's
+    /// flight duration (RF-07).
+    func animate(text: String, duration: CFTimeInterval) async {
         bannerTextLayer.string = text
 
         let containerWidth = containerLayer.bounds.width
@@ -89,7 +89,7 @@ final class AirplaneBannerView: NSView {
             let animation = CABasicAnimation(keyPath: "position.x")
             animation.fromValue = startX
             animation.toValue = endX
-            animation.duration = Self.flightDuration
+            animation.duration = duration
             animation.timingFunction = CAMediaTimingFunction(name: .linear)
 
             containerLayer.position = CGPoint(x: endX, y: y)

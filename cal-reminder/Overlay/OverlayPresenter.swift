@@ -7,9 +7,15 @@ protocol OverlayAnimating {
 }
 
 /// Default animator: shows an `OverlayPanel` over `NSScreen.main`, plays the flight on
-/// an `AirplaneBannerView`, then hides the panel again.
+/// an `AirplaneBannerView` at the current Flight Speed (RF-07), then hides the panel again.
 @MainActor
 final class DefaultOverlayAnimator: OverlayAnimating {
+    private let speedStore: FlightSpeedStoring
+
+    init(speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore()) {
+        self.speedStore = speedStore
+    }
+
     func animate(text: String) async {
         guard let screen = NSScreen.main else { return }
 
@@ -18,7 +24,7 @@ final class DefaultOverlayAnimator: OverlayAnimating {
         panel.contentView = view
 
         panel.orderFrontRegardless()
-        await view.animate(text: text)
+        await view.animate(text: text, duration: speedStore.flightSpeed.flightDuration)
         panel.orderOut(nil)
     }
 }

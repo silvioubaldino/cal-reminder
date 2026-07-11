@@ -22,7 +22,8 @@ related: [GLO]
 | RF-03 | Resolve each Event's effective popup Reminders | Must | For each Event, the app derives its Reminders from `overrides` or the calendar defaults, keeping only `popup` (RN-04) |
 | RF-04 | Fly the airplane + banner Overlay at each Reminder time | Must | At `Event start − Reminder minutes`, an airplane pulling a banner slides across the screen over all windows (RN-02) |
 | RF-05 | The banner shows the Event and time | Must | The banner text reads `<Title> at HH:MM (in X min)` |
-| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status, toggle the app on/off, test the animation, reconnect Google, and quit |
+| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status, toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, and quit |
+| RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts and applies from the next animation on |
 
 ## Non-functional (RNF)
 | ID | Category | Requirement | Target |
@@ -42,8 +43,8 @@ related: [GLO]
 - RN-05: Overlapping Triggers are queued — one animation plays at a time (FIFO).
 
 ## MVP scope
-- **In:** Google OAuth connect (read-only) with Keychain-stored token; reading timed Events from the primary calendar; resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status, on/off, test, reconnect, quit); queueing overlapping animations.
-- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI (banner color, speed, etc. stay hardcoded); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
+- **In:** Google OAuth connect (read-only) with Keychain-stored token; reading timed Events from the primary calendar; resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status, on/off, test, reconnect, Flight Speed, quit); queueing overlapping animations.
+- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI (banner color, etc. stay hardcoded — Flight Speed is the only configurable knob); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
 
 ---
 
@@ -65,3 +66,4 @@ ambiguity turns into a bug.
 | Airplane | _The little plane that flies across the Overlay pulling the banner._ | "plane sprite" |
 | Banner | _The strip pulled by the Airplane, showing the Event text._ | "faixa", "ribbon", "label" |
 | Poll | _The periodic fetch of upcoming Events from the Google Calendar API._ | "sync", "refresh" |
+| Flight Speed | _The animation-speed preset (Slow/Normal/Fast) controlling how fast the Airplane crosses the Overlay; user-selectable from the menu bar and persisted across restarts._ | "animation speed", "duration" |

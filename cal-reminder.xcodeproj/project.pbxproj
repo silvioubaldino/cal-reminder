@@ -11,6 +11,8 @@
 		3ABC509D49A51F80DA3C84C9 /* BannerText.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9B57ED8695E2269ADEB9007 /* BannerText.swift */; };
 		3AF96DFC563615DCDD3E06D5 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AC68BEBCE8DD7CE66E10F6 /* main.swift */; };
 		497140FB948279CF40181A28 /* AirplaneBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA2115764BEFBD609F9A5E /* AirplaneBannerView.swift */; };
+		5588EC2960D19BEEB25A915B /* FlightSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D750F21281CD1B00B52EF9A /* FlightSpeed.swift */; };
+		B29A63F3F9D6B5D30AA5C96B /* FlightSpeedStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463103C7129F6335C325EFD1 /* FlightSpeedStoreTests.swift */; };
 		63DA1D6DFA25BE7FD7316332 /* BannerTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 738E8DD7AB5C4E4F1EB48684 /* BannerTextTests.swift */; };
 		7F4BB18E26E346C3EF9A6A02 /* StatusMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AF619044AB2A0C2517FF6 /* StatusMenuController.swift */; };
 		C0FEB85F6F1E55759E0F825F /* Trigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08CE50B8BBB41B89E3C41C9E /* Trigger.swift */; };
@@ -34,6 +36,8 @@
 		04C114B1053E53045A60A75E /* cal-reminder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "cal-reminder.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		08CE50B8BBB41B89E3C41C9E /* Trigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trigger.swift; sourceTree = "<group>"; };
 		08EA2115764BEFBD609F9A5E /* AirplaneBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirplaneBannerView.swift; sourceTree = "<group>"; };
+		3D750F21281CD1B00B52EF9A /* FlightSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightSpeed.swift; sourceTree = "<group>"; };
+		463103C7129F6335C325EFD1 /* FlightSpeedStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightSpeedStoreTests.swift; sourceTree = "<group>"; };
 		58AC68BEBCE8DD7CE66E10F6 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		65ADDAB2A4C8475E666864A7 /* OverlayPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPresenter.swift; sourceTree = "<group>"; };
 		674AF619044AB2A0C2517FF6 /* StatusMenuController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuController.swift; sourceTree = "<group>"; };
@@ -61,6 +65,7 @@
 			children = (
 				08EA2115764BEFBD609F9A5E /* AirplaneBannerView.swift */,
 				C9B57ED8695E2269ADEB9007 /* BannerText.swift */,
+				3D750F21281CD1B00B52EF9A /* FlightSpeed.swift */,
 				C277F761929992254E20353C /* OverlayPanel.swift */,
 				65ADDAB2A4C8475E666864A7 /* OverlayPresenter.swift */,
 			);
@@ -81,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				738E8DD7AB5C4E4F1EB48684 /* BannerTextTests.swift */,
+				463103C7129F6335C325EFD1 /* FlightSpeedStoreTests.swift */,
 				99B31A4A800AE12BCA853BA4 /* OverlayQueueTests.swift */,
 			);
 			path = "cal-reminderTests";
@@ -208,6 +214,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				63DA1D6DFA25BE7FD7316332 /* BannerTextTests.swift in Sources */,
+				B29A63F3F9D6B5D30AA5C96B /* FlightSpeedStoreTests.swift in Sources */,
 				C78086DBC86ED62551ED835B /* OverlayQueueTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -219,6 +226,7 @@
 				497140FB948279CF40181A28 /* AirplaneBannerView.swift in Sources */,
 				31889CFA359DD5C015E19A91 /* AppDelegate.swift in Sources */,
 				3ABC509D49A51F80DA3C84C9 /* BannerText.swift in Sources */,
+				5588EC2960D19BEEB25A915B /* FlightSpeed.swift in Sources */,
 				E5234F40B878E671E483FA14 /* OverlayPanel.swift in Sources */,
 				C6284FB5D76D1176D314B002 /* OverlayPresenter.swift in Sources */,
 				7F4BB18E26E346C3EF9A6A02 /* StatusMenuController.swift in Sources */,

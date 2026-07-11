@@ -3,12 +3,18 @@ import Cocoa
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenuController: StatusMenuController?
-    private let overlayPresenter = OverlayPresenter(animator: DefaultOverlayAnimator())
+    private let flightSpeedStore = UserDefaultsFlightSpeedStore()
+    private lazy var overlayPresenter = OverlayPresenter(
+        animator: DefaultOverlayAnimator(speedStore: flightSpeedStore)
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusMenuController = StatusMenuController(onTestAnimation: { [weak self] in
-            self?.runTestAnimation()
-        })
+        statusMenuController = StatusMenuController(
+            onTestAnimation: { [weak self] in
+                self?.runTestAnimation()
+            },
+            speedStore: flightSpeedStore
+        )
     }
 
     private func runTestAnimation() {

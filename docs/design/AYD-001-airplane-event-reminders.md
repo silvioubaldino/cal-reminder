@@ -4,7 +4,7 @@ type: design
 status: draft
 updated: 2026-07-11
 parents: [REQ-01]
-children: [SPEC-001, SPEC-002, SPEC-003]  # generated per implementation slice (M1–M3)
+children: [SPEC-001, SPEC-002, SPEC-003, SPEC-004]  # generated per implementation slice (M1–M3, Flight Speed)
 related: [GLO]
 ---
 
@@ -28,6 +28,7 @@ window (including fullscreen). Inspiration: the `conniecodes` reel.
 | CalendarService | Poll + incremental sync, parse Events, resolve Reminders → Triggers | SPEC-002 |
 | Scheduler | Precise local timers per Trigger, dedupe, sleep/wake handling | SPEC-003 |
 | MenuBar UI / AppCoordinator | Status, on/off, test, reconnect, quit; wires modules | SPEC-003 |
+| MenuBar UI / OverlayPresenter | Flight Speed presets (Slow/Normal/Fast), persisted, applied to the next animation | SPEC-004 |
 
 ## Interfaces / contract (source of truth)
 
@@ -69,6 +70,9 @@ Keep only `method == "popup"`; emit one Trigger per remaining reminder.
 - **Event** — timed only (`start.dateTime`); all-day (`start.date`) ignored (RN-01).
 - **Reminder** — `{ method: "popup", minutes: Int }`.
 - **Trigger** — derived (see contract); not persisted beyond the in-memory dedupe set (MVP).
+- **Flight Speed** — `{ slow, normal, fast }`, each mapped to a flight duration; the user's
+  choice is the only persisted UI preference (stored outside the Keychain — it's not a
+  secret), read by the animator when a Trigger is enqueued.
 
 ## Flow
 
@@ -120,10 +124,12 @@ sequenceDiagram
 - **M2 — Google (SPEC-002):** `AuthManager` (OAuth PKCE + Keychain) + `CalendarService` (poll, parse, resolve Reminders).
 - **M3 — Scheduling (SPEC-003):** `Scheduler` (precise timers + dedupe + sleep/wake) + real Trigger → Overlay + menu control.
 - **M4 — Polish:** on/off, reconnect, error states; optional login item; optional persisted dedupe.
+- **M5 — Flight Speed (SPEC-004):** 3-preset Flight Speed menu, persisted, read by the animator.
 
 ## Out of scope / open questions
-- **Out:** publishing/notarization; Event actions (open Meet/Zoom); rich settings UI; multiple
-  Google accounts; all-day Events.
+- **Out:** publishing/notarization; Event actions (open Meet/Zoom); rich settings UI beyond
+  Flight Speed; multiple Google accounts; all-day Events.
 - **Open — multi-monitor:** MVP targets `NSScreen.main`; multi-screen behavior TBD.
 - **Open — dedupe persistence:** MVP keeps the fired-set in memory; persist across restarts?
-- **Open — banner styling:** default is the reel's pink; exact color/speed TBD (hardcoded for now).
+- **Open — banner styling:** default is the reel's pink; exact color TBD (hardcoded for now).
+  Speed is resolved by SPEC-004 (3 presets, no longer hardcoded).
