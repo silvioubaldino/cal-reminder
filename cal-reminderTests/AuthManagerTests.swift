@@ -20,7 +20,7 @@ private final class StubAuthorizationCodeProvider: AuthorizationCodeProviding {
     }
 
     func requestAuthorizationCode(
-        buildAuthorizationURL: (String) -> URL
+        buildAuthorizationURL: @escaping (String) -> URL
     ) async throws -> (code: String, redirectURI: String) {
         let redirectURI = "http://127.0.0.1:12345/"
         _ = buildAuthorizationURL(redirectURI)
