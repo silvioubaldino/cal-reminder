@@ -46,7 +46,9 @@ Trigger {
 **Module boundaries:**
 ```
 AuthManager
-  accessToken() async throws -> String     // refreshes on demand (401 → refresh → retry)
+  accessToken() async throws -> String     // refreshes on demand
+  authorizedRequest(makeRequest) async throws -> (Data, HTTPURLResponse)
+                                            // adds bearer token, retries once on 401
   connect() async throws                    // OAuth PKCE, stores refresh token in Keychain
   isConnected: Bool
 
@@ -109,7 +111,10 @@ sequenceDiagram
 2. OAuth consent screen → "External"; add your email as a **test user** (or "Publish app"
    to avoid the 7-day refresh-token expiry in Testing mode).
 3. Credentials → **OAuth Client ID** → **Desktop app**.
-4. First run: authorize in the browser; the app stores the refresh token in the Keychain.
+4. Save the Client ID + Client Secret as JSON at
+   `~/Library/Application Support/cal-reminder/google-oauth-config.json`:
+   `{ "clientId": "...", "clientSecret": "..." }` (never committed — TDR-001).
+5. First run: authorize in the browser; the app stores the refresh token in the Keychain.
 
 ## macOS considerations
 - `Info.plist` with `LSUIElement = true` (menu bar agent, no Dock icon).
