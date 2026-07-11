@@ -110,6 +110,8 @@ re-Polls (same pattern as `handleWake`).
 - `cal-reminder/App/AppDelegate.swift`
 - `cal-reminderTests/CalendarSelectionStoreTests.swift` *(new)*
 - `cal-reminderTests/CalendarServiceTests.swift`
+- `cal-reminderTests/GoogleCalendarAPITests.swift` *(new — covers the `accessRole` filter and `calendarId` path encoding directly, since `CalendarServiceTests` stubs `GoogleCalendarAPIProtocol`)*
+- `cal-reminderTests/AppCoordinatorTests.swift` (updated `FakeCalendarServicing` for `availableCalendars()`; added `calendarsChanged()` coverage)
 
 ## Tests
 - **Acceptance:**
@@ -126,7 +128,7 @@ re-Polls (same pattern as `handleWake`).
 ## Checklist
 - [ ] "Calendars" submenu lists every Calendar with a checkmark on the selected ones (manual)
 - [ ] Toggling a Calendar re-Polls immediately and updates upcoming Triggers (manual)
-- [ ] Default with no stored choice Polls all Calendars (`CalendarServiceTests`)
-- [ ] Only selected Calendars are Polled (`CalendarServiceTests`)
-- [ ] Dedupe ids are prefixed with `calendarId` (`CalendarServiceTests`)
-- [ ] Deselect keeps the other Calendars; selection persists across relaunch (`CalendarSelectionStoreTests`)
+- [x] Default with no stored choice Polls all Calendars (`CalendarServiceTests`)
+- [x] Only selected Calendars are Polled (`CalendarServiceTests`)
+- [x] Dedupe ids are prefixed with `calendarId` (`CalendarServiceTests`)
+- [x] Deselect keeps the other Calendars; selection persists across relaunch (`CalendarSelectionStoreTests`)

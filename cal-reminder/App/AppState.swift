@@ -8,4 +8,6 @@ struct AppState: Equatable {
     var nextTrigger: Trigger?
     /// The connected Google account's email, shown as "Connected as <email>" (RF-06).
     var userEmail: String?
+    /// Every Calendar in the connected account, for the "Calendars" menu (RF-10).
+    var calendars: [CalendarInfo] = []
 }

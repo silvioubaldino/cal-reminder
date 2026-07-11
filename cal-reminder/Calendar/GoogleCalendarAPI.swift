@@ -1,10 +1,14 @@
 import Foundation
 
 protocol GoogleCalendarAPIProtocol {
-    /// `events.list` on the primary calendar. Uses `syncToken` for incremental sync
-    /// (RNF-06) when available, otherwise falls back to `timeMin`/`timeMax`. The response
-    /// carries the calendar's `defaultReminders` inline (RN-04).
-    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?)
+    /// `calendarList.list` — every Calendar in the connected account (RF-10). Keeps only
+    /// entries whose `accessRole` can read Event details (owner | writer | reader).
+    func listCalendars() async throws -> [GoogleCalendarListEntry]
+
+    /// `events.list` on `calendarId`. Uses `syncToken` for incremental sync (RNF-06) when
+    /// available, otherwise falls back to `timeMin`/`timeMax`. The response carries that
+    /// Calendar's `defaultReminders` inline (RN-04).
+    func listEvents(calendarId: String, timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?)
 }
 
 enum GoogleCalendarAPIError: Error {
@@ -19,9 +23,19 @@ final class GoogleCalendarAPI: GoogleCalendarAPIProtocol {
         self.authManager = authManager
     }
 
-    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?) {
+    func listCalendars() async throws -> [GoogleCalendarListEntry] {
+        let readableRoles: Set<String> = ["owner", "writer", "reader"]
+        let data = try await get(baseURL.appendingPathComponent("users/me/calendarList"))
+        let decoded = try JSONDecoder().decode(GoogleCalendarListResponse.self, from: data)
+        let kept = decoded.items.filter { readableRoles.contains($0.accessRole) }
+        print("[GoogleCalendarAPI] listCalendars: \(decoded.items.count) total, \(kept.count) readable → \(decoded.items.map { "\($0.id) (\($0.accessRole))" })")
+        return kept
+    }
+
+    func listEvents(calendarId: String, timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?) {
+        let encodedCalendarId = calendarId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? calendarId
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("calendars/primary/events"),
+            url: baseURL.appendingPathComponent("calendars/\(encodedCalendarId)/events"),
             resolvingAgainstBaseURL: false
         )!
 
@@ -47,6 +61,7 @@ final class GoogleCalendarAPI: GoogleCalendarAPIProtocol {
             return request
         }
         guard response.statusCode == 200 else {
+            print("[GoogleCalendarAPI] GET \(url.absoluteString) → HTTP \(response.statusCode): \(String(data: data, encoding: .utf8) ?? "<non-utf8 body>")")
             throw GoogleCalendarAPIError.unexpectedStatus(response.statusCode)
         }
         return data

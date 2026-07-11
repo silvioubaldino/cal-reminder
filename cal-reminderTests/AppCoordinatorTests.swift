@@ -27,6 +27,7 @@ private final class FakeAuthManaging: AuthManaging {
 
 private final class FakeCalendarServicing: CalendarServicing {
     var triggers: [Trigger] = []
+    var calendars: [CalendarInfo] = []
     var error: Error?
     private(set) var pollCallCount = 0
 
@@ -34,6 +35,10 @@ private final class FakeCalendarServicing: CalendarServicing {
         pollCallCount += 1
         if let error { throw error }
         return triggers
+    }
+
+    func availableCalendars() async throws -> [CalendarInfo] {
+        calendars
     }
 }
 
@@ -184,6 +189,37 @@ final class AppCoordinatorTests: XCTestCase {
 
         // Assert
         XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+    }
+
+    func test_pollPopulatesStateCalendars() async {
+        // Arrange (RF-10: the menu reflects the account's Calendars after every Poll)
+        let calendar = FakeCalendarServicing()
+        calendar.calendars = [CalendarInfo(id: "A", title: "A", isPrimary: true)]
+        let coordinator = makeCoordinator(calendar: calendar)
+
+        // Act
+        await coordinator.poll()
+
+        // Assert
+        XCTAssertEqual(coordinator.state.calendars, [CalendarInfo(id: "A", title: "A", isPrimary: true)])
+    }
+
+    func test_calendarsChangedCancelsSchedulerAndRePolls() async throws {
+        // Arrange (RF-10: a selection change re-Polls immediately, mirroring handleWake)
+        let calendar = FakeCalendarServicing()
+        let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
+        calendar.triggers = [upcoming]
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(calendar: calendar, scheduler: scheduler)
+
+        // Act
+        coordinator.calendarsChanged()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(calendar.pollCallCount, 1)
         XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
     }
 }

@@ -84,8 +84,10 @@ final class AppCoordinator {
             await scheduler.schedule(triggers)
             state.connected = true
             state.nextTrigger = triggers.min { $0.fireDate < $1.fireDate }
+            state.calendars = (try? await calendar.availableCalendars()) ?? state.calendars
             await refreshUserEmail()
         } catch {
+            print("[AppCoordinator] poll failed: \(error)")
             state.connected = auth.isConnected
         }
         notify()
@@ -95,6 +97,15 @@ final class AppCoordinator {
     func handleWake() async {
         await scheduler.cancelAll()
         await poll()
+    }
+
+    /// A Calendar-selection change (RF-10): re-arm from a fresh Poll immediately, mirroring
+    /// `handleWake()`, instead of waiting for the ~120s PollLoop.
+    func calendarsChanged() {
+        Task {
+            await scheduler.cancelAll()
+            await poll()
+        }
     }
 
     /// Fetches the connected account's email into `state.userEmail` (RF-06). Skipped
