@@ -28,14 +28,13 @@ struct GoogleEvent: Decodable {
 struct GoogleEventsListResponse: Decodable {
     let items: [GoogleEvent]
     let nextSyncToken: String?
+    /// The primary calendar's default reminders, returned inline on every `events.list`
+    /// response — used for Events with `reminders.useDefault == true` (RN-04).
+    let defaultReminders: [GoogleCalendarDefaultReminder]?
 }
 
 /// A calendar's default reminder, used when an Event has `reminders.useDefault == true`.
 struct GoogleCalendarDefaultReminder: Decodable {
     let method: String
     let minutes: Int
-}
-
-struct GoogleCalendarEntry: Decodable {
-    let defaultReminders: [GoogleCalendarDefaultReminder]
 }

@@ -2,12 +2,9 @@ import Foundation
 
 protocol GoogleCalendarAPIProtocol {
     /// `events.list` on the primary calendar. Uses `syncToken` for incremental sync
-    /// (RNF-06) when available, otherwise falls back to `timeMin`/`timeMax`.
-    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?)
-
-    /// The primary calendar's default reminders (`calendarList.get`), used for Events
-    /// with `reminders.useDefault == true` (RN-04).
-    func calendarDefaultReminders() async throws -> [GoogleCalendarDefaultReminder]
+    /// (RNF-06) when available, otherwise falls back to `timeMin`/`timeMax`. The response
+    /// carries the calendar's `defaultReminders` inline (RN-04).
+    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?)
 }
 
 enum GoogleCalendarAPIError: Error {
@@ -22,7 +19,7 @@ final class GoogleCalendarAPI: GoogleCalendarAPIProtocol {
         self.authManager = authManager
     }
 
-    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?) {
+    func listEvents(timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?) {
         var components = URLComponents(
             url: baseURL.appendingPathComponent("calendars/primary/events"),
             resolvingAgainstBaseURL: false
@@ -40,14 +37,7 @@ final class GoogleCalendarAPI: GoogleCalendarAPIProtocol {
 
         let data = try await get(components.url!)
         let decoded = try JSONDecoder().decode(GoogleEventsListResponse.self, from: data)
-        return (decoded.items, decoded.nextSyncToken)
-    }
-
-    func calendarDefaultReminders() async throws -> [GoogleCalendarDefaultReminder] {
-        let url = baseURL.appendingPathComponent("calendars/primary")
-        let data = try await get(url)
-        let decoded = try JSONDecoder().decode(GoogleCalendarEntry.self, from: data)
-        return decoded.defaultReminders
+        return (decoded.items, decoded.nextSyncToken, decoded.defaultReminders)
     }
 
     private func get(_ url: URL) async throws -> Data {
