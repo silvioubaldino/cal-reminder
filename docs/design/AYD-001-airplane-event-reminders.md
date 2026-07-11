@@ -4,7 +4,7 @@ type: design
 status: draft
 updated: 2026-07-11
 parents: [REQ-01]
-children: []          # SPECs to be generated per implementation slice
+children: [SPEC-001, SPEC-002, SPEC-003]  # generated per implementation slice (M1–M3)
 related: [GLO]
 ---
 
@@ -23,11 +23,11 @@ window (including fullscreen). Inspiration: the `conniecodes` reel.
 ## Affected modules
 | Module | Role in this feature | Generated SPEC |
 |--------|----------------------|----------------|
-| OverlayPresenter | Draws the Airplane + Banner over all windows; FIFO queue | SPEC-001 (planned) |
-| AuthManager | OAuth PKCE flow, token refresh, Keychain storage | SPEC-002 (planned) |
-| CalendarService | Poll + incremental sync, parse Events, resolve Reminders → Triggers | SPEC-002 (planned) |
-| Scheduler | Precise local timers per Trigger, dedupe, sleep/wake handling | SPEC-003 (planned) |
-| MenuBar UI / AppCoordinator | Status, on/off, test, reconnect, quit; wires modules | SPEC-003 (planned) |
+| OverlayPresenter | Draws the Airplane + Banner over all windows; FIFO queue | SPEC-001 |
+| AuthManager | OAuth PKCE flow, token refresh, Keychain storage | SPEC-002 |
+| CalendarService | Poll + incremental sync, parse Events, resolve Reminders → Triggers | SPEC-002 |
+| Scheduler | Precise local timers per Trigger, dedupe, sleep/wake handling | SPEC-003 |
+| MenuBar UI / AppCoordinator | Status, on/off, test, reconnect, quit; wires modules | SPEC-003 |
 
 ## Interfaces / contract (source of truth)
 
