@@ -1,0 +1,39 @@
+# SwiftLint configuration — the standardized rule set CONV §B.1 refers to.
+# Scoped to the app and its tests. Starts lenient so the current tree passes
+# `swiftlint --strict` (AYD-004 decision: tune the config to the code first,
+# then ratchet the marked knobs down in follow-up SPECs).
+
+included:
+  - cal-reminder
+  - cal-reminderTests
+
+disabled_rules:
+  - force_try   # ratchet: test JSON fixtures build data with `try!`; scope this out later
+  - todo        # ratchet: don't fail the build on TODO/FIXME markers for now
+
+# ratchet: current code has lines up to ~232 chars; lower these over time.
+line_length:
+  warning: 250
+  error: 400
+
+# `id` is a first-class domain term (Trigger id, Event id) — allow it.
+identifier_name:
+  excluded:
+    - id
+  min_length:
+    warning: 2
+
+# ratchet: generous size/complexity budgets so the current code is green;
+# tighten as the codebase is refactored.
+type_body_length:
+  warning: 400
+  error: 600
+file_length:
+  warning: 700
+  error: 1000
+function_body_length:
+  warning: 100
+  error: 160
+cyclomatic_complexity:
+  warning: 20
+  error: 30

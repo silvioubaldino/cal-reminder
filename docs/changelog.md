@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-007: a CI gate that builds, tests, and lints (SwiftLint) every push and pull request, blocking the merge on failure.
 - Designed AYD-005: App Sandbox and privacy compliance artifacts (entitlements, privacy manifest, app icon, bundle metadata, privacy policy) needed for the Mac App Store.
 - Designed AYD-004: an automated CI gate that builds, tests, and lints every push and pull request.
 - Designed AYD-003: making the app distributable through the Mac App Store, rearchitecting Google sign-in so it works sandboxed and can be reviewed without manual credentials.

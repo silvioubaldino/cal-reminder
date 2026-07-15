@@ -1,11 +1,11 @@
 ---
 id: AYD-004
 type: design
-status: draft
+status: approved
 updated: 2026-07-15
 parents: [RNF-09]
 related: [GLO, CONV]
-children: []
+children: [SPEC-007]
 ---
 
 # AYD-004: CI & code-quality gate
