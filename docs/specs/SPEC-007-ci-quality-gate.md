@@ -1,10 +1,10 @@
 ---
 id: SPEC-007
 type: spec
-status: draft
+status: done
 parents: [AYD-004]
 related: [GLO, CONV]
-updated: 2026-07-15
+updated: 2026-07-16
 ---
 
 # SPEC-007: CI & code-quality gate — what + how
@@ -91,8 +91,8 @@ config, per AYD-004's "start lenient, then ratchet" decision.
   `test` step exercises.
 
 ## Checklist
-- [ ] Workflow triggers on push and PR (observed on the PR)
-- [ ] `swiftlint --strict` passes on the current tree
-- [ ] `xcodebuild build` passes without signing
-- [ ] `xcodebuild test` passes (existing suite green)
+- [x] Workflow triggers on push and PR (observed on PR #6)
+- [x] `swiftlint --strict` passes on the current tree
+- [x] `xcodebuild build` passes without signing
+- [x] `xcodebuild test` passes (existing suite green)
 - [ ] A red step blocks the merge (branch protection is a repo setting, noted for the owner)
