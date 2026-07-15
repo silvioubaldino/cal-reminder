@@ -15,8 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Select latest Xcode
+        # XcodeGen emits the current project format (objectVersion 77), so CI must
+        # use an Xcode new enough to read it. Pick the newest installed Xcode rather
+        # than pinning a patch version that image rotation may drop.
+        run: |
+          latest="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
 
       - name: Install tools
         run: brew install xcodegen swiftlint
