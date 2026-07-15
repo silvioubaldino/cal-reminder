@@ -3,9 +3,9 @@ id: REQ-01
 type: requirements
 title: Requirements and glossary
 status: approved
-updated: 2026-07-11
+updated: 2026-07-15
 parents: []
-children: [AYD-001]
+children: [AYD-001, AYD-003, AYD-004, AYD-005]
 related: [GLO]
 ---
 
@@ -37,6 +37,9 @@ related: [GLO]
 | RNF-04 | Resilience | Tolerant to sleep/wake and network loss | Re-syncs on wake; keeps scheduled Triggers across transient network failures |
 | RNF-05 | Security | Secrets are stored securely | Tokens only in the macOS Keychain, never in plaintext on disk |
 | RNF-06 | Network | Efficient calendar sync | Incremental poll using `syncToken` |
+| RNF-07 | Distribution | Distributable through the Mac App Store, and testable by App Review | App Sandbox enabled and signed with a real Team; App Review can connect and exercise the app with a demo Google account, without creating any Google Cloud credentials (AYD-003) |
+| RNF-08 | Privacy compliance | Declares data collection/use to Apple and Google | Ships a privacy manifest (`PrivacyInfo.xcprivacy`) and a public privacy-policy URL; the `calendar.readonly` restricted scope passes Google verification (AYD-005) |
+| RNF-09 | Quality gate | Every change is built, tested, and linted automatically | CI builds the app, runs the test suite, and lints the sources on each push/PR; a failure blocks the merge (AYD-004) |
 
 ## Business rules
 - RN-01: Only timed Events generate Triggers; all-day Events are ignored.
@@ -47,7 +50,14 @@ related: [GLO]
 
 ## MVP scope
 - **In:** Google OAuth connect (read-only, including the account's email for display) with Keychain-stored token; reading timed Events from the selected Calendars of the connected account; choosing which Calendars to be alerted on (RF-10); resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status incl. connected email, on/off, test, reconnect, Flight Speed, Banner color, Calendar selection, quit); queueing overlapping animations.
-- **Out (for now):** publishing/notarization/distribution; actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed, Banner color, and Calendar selection presets (e.g. custom colors, banner size); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
+- **Out (for now):** actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed, Banner color, and Calendar selection presets (e.g. custom colors, banner size); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
+
+## Post-MVP: App Store readiness (planned)
+Distribution/notarization was originally out of MVP; it is now scoped (not yet built) across three
+independent AYDs so each has a defined boundary: **AYD-003** (Mac App Store distribution & OAuth
+rearchitecture — RNF-07), **AYD-005** (App Sandbox & privacy compliance artifacts — RNF-08), and
+**AYD-004** (CI & code-quality gate — RNF-09). AYD-004 can land on its own; AYD-003 depends on the
+entitlements defined in AYD-005.
 
 ---
 
