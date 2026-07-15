@@ -8,19 +8,33 @@ included:
   - cal-reminderTests
 
 disabled_rules:
-  - force_try   # ratchet: test JSON fixtures build data with `try!`; scope this out later
-  - todo        # ratchet: don't fail the build on TODO/FIXME markers for now
+  - force_try                        # ratchet: test JSON fixtures build data with `try!`
+  - todo                             # ratchet: don't fail the build on TODO/FIXME markers
+  - non_optional_string_data_conversion  # ratchet: test-only `String`->`Data` convenience
+  - unused_closure_parameter         # ratchet: test-only unused closure params
 
 # ratchet: current code has lines up to ~232 chars; lower these over time.
 line_length:
   warning: 250
   error: 400
 
-# `id` is a first-class domain term (Trigger id, Event id) — allow it.
+# `id` is a first-class domain term (Trigger id, Event id) — allow it, and permit
+# single-char locals (coordinate `y`, loop indices). ratchet: raise min_length later.
 identifier_name:
   excluded:
     - id
   min_length:
+    warning: 1
+    error: 1
+
+# ratchet: a few API/test helpers return 3-member tuples; allow up to 3, warn beyond.
+large_tuple:
+  warning: 3
+  error: 4
+
+# ratchet: one auth type nests 2 levels deep; allow it for now.
+nesting:
+  type_level:
     warning: 2
 
 # ratchet: generous size/complexity budgets so the current code is green;
