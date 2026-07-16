@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-006: Events with no popup Reminder configured now get a default 5-minutes-before alert; Events that already have one keep only their own.
 - Implemented SPEC-009: replaced the per-user, on-disk Google OAuth credentials with a single embedded public client, so the app no longer needs a manually-created credentials file to connect, needed for App Review.
 - Implemented SPEC-008: App Sandbox entitlements, a privacy manifest, a full app icon, real bundle metadata, and a public privacy policy, needed for the Mac App Store.
 - Implemented SPEC-007: a CI gate that builds, tests, and lints (SwiftLint) every push and pull request, blocking the merge on failure.

@@ -4,7 +4,7 @@ type: design
 status: draft
 updated: 2026-07-11
 parents: [REQ-01]
-children: [SPEC-001, SPEC-002, SPEC-003, SPEC-004]  # generated per implementation slice (M1–M3, Flight Speed)
+children: [SPEC-001, SPEC-002, SPEC-003, SPEC-004, SPEC-006]  # generated per implementation slice (M1–M3, Flight Speed, default Reminder)
 related: [GLO]
 ---
 

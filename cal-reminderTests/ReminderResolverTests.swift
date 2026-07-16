@@ -81,4 +81,43 @@ final class ReminderResolverTests: XCTestCase {
         // Assert
         XCTAssertEqual(minutes, [10, 2])
     }
+
+    func test_useDefaultTrue_noPopupCalendarDefault_fallsBackToFiveMinutes() {
+        // Arrange
+        let event = event(useDefault: true)
+        let defaults = [GoogleCalendarDefaultReminder(method: "email", minutes: 30)]
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(for: event, calendarDefaults: defaults)
+
+        // Assert
+        XCTAssertEqual(minutes, [5])
+    }
+
+    func test_useDefaultFalse_noPopupOverride_fallsBackToFiveMinutes() {
+        // Arrange
+        let event = event(
+            useDefault: false,
+            overrides: [.init(method: "email", minutes: 60)]
+        )
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(for: event, calendarDefaults: [
+            GoogleCalendarDefaultReminder(method: "popup", minutes: 10)
+        ])
+
+        // Assert
+        XCTAssertEqual(minutes, [5])
+    }
+
+    func test_useDefaultFalse_emptyOverrides_fallsBackToFiveMinutes() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(for: event, calendarDefaults: [])
+
+        // Assert
+        XCTAssertEqual(minutes, [5])
+    }
 }
