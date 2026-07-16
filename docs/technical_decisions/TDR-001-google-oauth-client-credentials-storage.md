@@ -2,11 +2,11 @@
 id: TDR-001
 type: tdr
 title: Google OAuth client credentials storage
-status: accepted
-updated: 2026-07-11
+status: superseded
+updated: 2026-07-16
 parents: [SPEC-002]
 related: [AYD-001]
-superseded_by: null
+superseded_by: TDR-002
 ---
 
 # TDR-001: Google OAuth client credentials storage

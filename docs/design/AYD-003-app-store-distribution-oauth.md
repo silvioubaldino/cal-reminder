@@ -1,11 +1,11 @@
 ---
 id: AYD-003
 type: design
-status: draft
-updated: 2026-07-15
+status: approved
+updated: 2026-07-16
 parents: [RNF-07, REQ-01]
-children: []
-related: [GLO, AYD-001, TDR-001]
+children: [SPEC-009]
+related: [GLO, AYD-001, TDR-001, TDR-002]
 ---
 
 # AYD-003: Mac App Store distribution & OAuth rearchitecture
@@ -30,11 +30,11 @@ app requires.
 ## Affected modules
 | Module | Role in this feature | Generated SPEC |
 |--------|----------------------|----------------|
-| AuthManager | Stop reading `GoogleOAuthConfig` from disk; use the embedded public Client ID; run PKCE **without a client secret** (the correct desktop/native flow) | SPEC-006 |
-| GoogleOAuthConfig | Repurpose from "load user JSON" to "provide the embedded Client ID + scopes"; drop `clientSecret` | SPEC-006 |
-| LoopbackAuthorizationCodeProvider | Unchanged behavior, but must run under the sandbox (needs the `network.server` entitlement declared in AYD-005) | SPEC-006 |
-| Build config (`project.yml`) | Real `DEVELOPMENT_TEAM`, App Store provisioning, `CODE_SIGN_STYLE`, versioning | SPEC-006 |
-| (docs) TDR-001 | Superseded by a new TDR documenting the embedded-public-client decision | SPEC-006 |
+| AuthManager | Stop reading `GoogleOAuthConfig` from disk; use the embedded public Client ID; run PKCE **without a client secret** (the correct desktop/native flow) | SPEC-009 |
+| GoogleOAuthConfig | Repurpose from "load user JSON" to "provide the embedded Client ID + scopes"; drop `clientSecret` | SPEC-009 |
+| LoopbackAuthorizationCodeProvider | Unchanged behavior, but must run under the sandbox (needs the `network.server` entitlement declared in AYD-005) | SPEC-009 |
+| Build config (`project.yml`) | Real `DEVELOPMENT_TEAM`, App Store provisioning, `CODE_SIGN_STYLE`, versioning | SPEC-009 |
+| (docs) TDR-001 | Superseded by a new TDR documenting the embedded-public-client decision | SPEC-009 |
 
 ## Interfaces / contract (source of truth)
 

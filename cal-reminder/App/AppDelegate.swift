@@ -12,10 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             animator: DefaultOverlayAnimator(speedStore: flightSpeedStore)
         )
 
-        let config = (try? GoogleOAuthConfig.loadFromDisk())
-            ?? GoogleOAuthConfig(clientID: "", clientSecret: "")
         let authManager = AuthManager(
-            config: config,
+            config: .embedded,
             tokenStore: KeychainStore(),
             httpClient: URLSessionHTTPClient(),
             authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
