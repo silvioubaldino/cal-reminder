@@ -1,7 +1,7 @@
 ---
 id: SPEC-006
 type: spec
-status: draft
+status: done
 parents: [AYD-001]
 related: [GLO, REQ-01]
 updated: 2026-07-16
@@ -77,7 +77,7 @@ returned minutes, so no other module changes.
   email-only override → `[5]`.
 
 ## Checklist
-- [ ] Event with no popup Reminder resolves to `[5]` (`ReminderResolverTests`)
-- [ ] Event that opts out (useDefault=false, no popup override) resolves to `[5]` (`ReminderResolverTests`)
-- [ ] Existing popup Reminders are returned unchanged, no `5` added (`ReminderResolverTests`)
-- [ ] Email-only Reminder falls back to `[5]` (`ReminderResolverTests`)
+- [x] Event with no popup Reminder resolves to `[5]` (`ReminderResolverTests`)
+- [x] Event that opts out (useDefault=false, no popup override) resolves to `[5]` (`ReminderResolverTests`)
+- [x] Existing popup Reminders are returned unchanged, no `5` added (`ReminderResolverTests`)
+- [x] Email-only Reminder falls back to `[5]` (`ReminderResolverTests`)

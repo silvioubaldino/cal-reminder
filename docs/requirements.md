@@ -3,7 +3,7 @@ id: REQ-01
 type: requirements
 title: Requirements and glossary
 status: approved
-updated: 2026-07-15
+updated: 2026-07-16
 parents: []
 children: [AYD-001, AYD-003, AYD-004, AYD-005]
 related: [GLO]
@@ -47,6 +47,7 @@ related: [GLO]
 - RN-03: The same Reminder never fires twice (dedupe by `calendarId#eventId#minutes`).
 - RN-04: If `reminders.useDefault` is true, use the calendar's default Reminders; otherwise use `reminders.overrides`, keeping only `method == popup`.
 - RN-05: Overlapping Triggers are queued — one animation plays at a time (FIFO).
+- RN-06: If an Event's resolved popup Reminders (RN-04) are empty, add a single 5-minutes-before Reminder; otherwise use the resolved set unchanged.
 
 ## MVP scope
 - **In:** Google OAuth connect (read-only, including the account's email for display) with Keychain-stored token; reading timed Events from the selected Calendars of the connected account; choosing which Calendars to be alerted on (RF-10); resolving popup Reminders; airplane + banner Overlay over all windows; menu bar control (status incl. connected email, on/off, test, reconnect, Flight Speed, Banner color, Calendar selection, quit); queueing overlapping animations.
