@@ -6,12 +6,18 @@ protocol Scheduling: AnyObject {
     func schedule(_ triggers: [Trigger]) async
     func setEnabled(_ enabled: Bool) async
     func cancelAll() async
+
+    /// The not-yet-fired armed Trigger with the soonest `fireDate`, or `nil` if none is
+    /// armed. Reflects the accumulated set across every `schedule(_:)` call so far — not
+    /// just the last one — since incremental Polls (RNF-06) only report changed Events.
+    func nextArmedTrigger() async -> Trigger?
 }
 
 actor Scheduler: Scheduling {
     private struct Armed {
         let task: Task<Void, Never>
-        let fireDate: Date
+        let trigger: Trigger
+        var fireDate: Date { trigger.fireDate }
     }
 
     private let clock: () -> Date
@@ -52,6 +58,10 @@ actor Scheduler: Scheduling {
         armed.removeAll()
     }
 
+    func nextArmedTrigger() -> Trigger? {
+        armed.values.min { $0.fireDate < $1.fireDate }?.trigger
+    }
+
     /// Test-only hook (mirrors `OverlayPresenter.waitUntilIdle()`): awaits every currently
     /// armed timer so tests can use short real delays instead of arbitrary sleeps.
     func waitForPendingFires() async {
@@ -67,7 +77,7 @@ actor Scheduler: Scheduling {
             guard !Task.isCancelled else { return }
             await self?.fire(trigger)
         }
-        armed[trigger.id] = Armed(task: task, fireDate: trigger.fireDate)
+        armed[trigger.id] = Armed(task: task, trigger: trigger)
     }
 
     private func fire(_ trigger: Trigger) {

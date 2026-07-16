@@ -83,7 +83,10 @@ final class AppCoordinator {
             let triggers = try await calendar.poll()
             await scheduler.schedule(triggers)
             state.connected = true
-            state.nextTrigger = triggers.min { $0.fireDate < $1.fireDate }
+            // Not `triggers.min(...)`: incremental Polls (RNF-06) only report Events that
+            // changed since the last sync, so a still-upcoming, unchanged Trigger can be
+            // absent from this Poll's list — the Scheduler holds the accumulated truth.
+            state.nextTrigger = await scheduler.nextArmedTrigger()
             state.calendars = (try? await calendar.availableCalendars()) ?? state.calendars
             await refreshUserEmail()
         } catch {

@@ -84,4 +84,35 @@ final class SchedulerTests: XCTestCase {
         let fired = await spy.firedIds
         XCTAssertTrue(fired.isEmpty)
     }
+
+    func test_nextArmedTriggerReflectsSoonestAcrossSeparateSchedules() async {
+        // Arrange: two separate schedule() calls, mirroring two incremental Polls that
+        // each report a different subset of still-upcoming Events.
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        let soon = trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(60))
+        let later = trigger(id: "evt2#5", fireDate: Date().addingTimeInterval(120))
+
+        // Act
+        await scheduler.schedule([later])
+        await scheduler.schedule([soon])
+
+        // Assert
+        let next = await scheduler.nextArmedTrigger()
+        XCTAssertEqual(next?.id, "evt1#5")
+    }
+
+    func test_nextArmedTriggerIsNilAfterCancelAll() async {
+        // Arrange
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        await scheduler.schedule([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(60))])
+
+        // Act
+        await scheduler.cancelAll()
+
+        // Assert
+        let next = await scheduler.nextArmedTrigger()
+        XCTAssertNil(next)
+    }
 }

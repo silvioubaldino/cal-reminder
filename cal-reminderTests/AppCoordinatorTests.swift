@@ -46,9 +46,13 @@ private final class FakeScheduler: Scheduling {
     private(set) var scheduledTriggers: [[Trigger]] = []
     private(set) var enabledCalls: [Bool] = []
     private(set) var cancelAllCallCount = 0
+    private var armed: [String: Trigger] = [:]
 
     func schedule(_ triggers: [Trigger]) async {
         scheduledTriggers.append(triggers)
+        for trigger in triggers {
+            armed[trigger.id] = trigger
+        }
     }
 
     func setEnabled(_ enabled: Bool) async {
@@ -57,6 +61,11 @@ private final class FakeScheduler: Scheduling {
 
     func cancelAll() async {
         cancelAllCallCount += 1
+        armed.removeAll()
+    }
+
+    func nextArmedTrigger() async -> Trigger? {
+        armed.values.min { $0.fireDate < $1.fireDate }
     }
 }
 
@@ -112,6 +121,24 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.state.connected)
         XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
         XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+    }
+
+    func test_nextTriggerSurvivesAPollWithNoChanges() async {
+        // Arrange: an incremental Poll (RNF-06) can return no changed Events even though
+        // an earlier-armed Trigger is still upcoming — nextTrigger must not go stale to nil.
+        let calendar = FakeCalendarServicing()
+        let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
+        calendar.triggers = [upcoming]
+        let coordinator = makeCoordinator(calendar: calendar)
+        await coordinator.poll()
+        XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
+
+        // Act: next Poll's delta is empty (nothing changed on the Calendar)
+        calendar.triggers = []
+        await coordinator.poll()
+
+        // Assert
+        XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
     }
 
     func test_failedPollKeepsConnectedAtAuthIsConnected() async {

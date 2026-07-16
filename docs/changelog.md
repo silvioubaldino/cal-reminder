@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fixed the menu bar's "Next" Reminder display going stale to "No upcoming reminders" after an incremental Poll reported no changed Events, even though a Trigger was still correctly armed.
 - Reframed the project scope from "personal, local-use" to a distributed, commercial product, and added RNF-10: the app's OAuth client secret should live behind an app-owned token broker rather than embedded in the shipped binary (planned; the interim embedded-secret state stays documented in TDR-003).
 - Fixed Google sign-in: the embedded OAuth client now sends the client secret Google requires for installed apps, so connecting actually completes and the account email, Calendars, and next Event appear (TDR-003 supersedes TDR-002).
 - Implemented SPEC-006: Events with no popup Reminder configured now get a default 5-minutes-before alert; Events that already have one keep only their own.
