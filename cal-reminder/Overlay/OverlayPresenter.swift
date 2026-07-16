@@ -12,28 +12,36 @@ protocol OverlayAnimating {
 final class DefaultOverlayAnimator: OverlayAnimating {
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
+    private let skipOnClickStore: SkipOnClickStoring
 
     init(
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
-        colorStore: BannerColorStoring = UserDefaultsBannerColorStore()
+        colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
+        skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore()
     ) {
         self.speedStore = speedStore
         self.colorStore = colorStore
+        self.skipOnClickStore = skipOnClickStore
     }
 
     func animate(text: String) async {
         guard let screen = NSScreen.main else { return }
 
+        let skipOnClick = skipOnClickStore.skipOnClick
+
         let panel = OverlayPanel(screen: screen)
         let view = AirplaneBannerView(frame: CGRect(origin: .zero, size: screen.frame.size))
         view.setBannerColor(colorStore.bannerColor.color)
-        view.onSkipRequested = { [weak view] in view?.skipToEnd() }
+        if skipOnClick {
+            view.onSkipRequested = { [weak view] in view?.skipToEnd() }
+        }
         panel.contentView = view
 
         panel.orderFrontRegardless()
-        // Click-through by default (RNF-02); accept clicks only while this flight
-        // plays, so the user can click anywhere to skip it (RF-09).
-        panel.ignoresMouseEvents = false
+        // Click-through by default (RNF-02); accept clicks only while this flight plays
+        // and only when the user opted into click-to-skip (RF-09) — otherwise the panel
+        // stays click-through for the whole flight and the Airplane finishes on its own.
+        panel.ignoresMouseEvents = !skipOnClick
         await view.animate(text: text, speed: speedStore.flightSpeed)
         panel.ignoresMouseEvents = true
         panel.orderOut(nil)

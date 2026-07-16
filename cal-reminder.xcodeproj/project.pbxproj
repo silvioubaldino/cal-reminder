@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		00F6A6DFE0C368A73DB55F96 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38D9BFAA591E7083361750D /* KeychainStore.swift */; };
 		0141BB9A365D36D96936EDA0 /* ReminderResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25B57BF2FFC27FB3ED4C7B78 /* ReminderResolver.swift */; };
+		014C6E08FBC5CE2F3214EE40 /* SkipOnClick.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB777E90336D52C33F6F14C /* SkipOnClick.swift */; };
 		02B5D4AD1022D9C939932065 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBBBA6AF01B37B16BDD600A /* KeychainStoreTests.swift */; };
 		0F208F0ABC3AAEE5155D41F5 /* CalendarSelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 547E09E339923758B69AF2C3 /* CalendarSelectionStore.swift */; };
 		1CED99C4D41AF2359711E57A /* AuthManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F528BEDE91CA1BA53BAE446B /* AuthManagerTests.swift */; };
@@ -26,8 +27,10 @@
 		4D0F2DEF5B6C17A8E6611CCF /* BannerColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A4A9D44CAC4808D96BB60C /* BannerColor.swift */; };
 		548F404056FB47AD5189728B /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BB6AA4004C6AF27AC07E36 /* AppCoordinator.swift */; };
 		63DA1D6DFA25BE7FD7316332 /* BannerTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 738E8DD7AB5C4E4F1EB48684 /* BannerTextTests.swift */; };
+		7C28FDD80C58F7BEE03C1B67 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B192A1036206781CDED256B0 /* PrivacyInfo.xcprivacy */; };
 		7F4BB18E26E346C3EF9A6A02 /* StatusMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AF619044AB2A0C2517FF6 /* StatusMenuController.swift */; };
 		89B8A19D24B2D7011992D0D2 /* FlightSpeedStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DC89EE24E945ABAAC895E3 /* FlightSpeedStoreTests.swift */; };
+		8C1CE61E80066433654C4C96 /* SkipOnClickStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B775B07936CFE93D6C6AEC0E /* SkipOnClickStoreTests.swift */; };
 		8E97D52262DADCE5C4AF8666 /* HTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7524B9F07AB2204B5AB9D4E5 /* HTTPClient.swift */; };
 		90642A8B1F0B56D40CF73DC7 /* CalendarSelectionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF48991B0B883572AAE4C76 /* CalendarSelectionStoreTests.swift */; };
 		94C96B80F0981A0834CCF3D1 /* AppCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A759F4F6DED17D2FA2FF0C55 /* AppCoordinatorTests.swift */; };
@@ -68,6 +71,7 @@
 		25B57BF2FFC27FB3ED4C7B78 /* ReminderResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderResolver.swift; sourceTree = "<group>"; };
 		26A4A9D44CAC4808D96BB60C /* BannerColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerColor.swift; sourceTree = "<group>"; };
 		28ADDAD938173EEF6A3A43AB /* CalendarServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarServiceTests.swift; sourceTree = "<group>"; };
+		2A64F46A78861331E095BF0E /* cal-reminder.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "cal-reminder.entitlements"; sourceTree = "<group>"; };
 		2E3748BB03942BB4184459CA /* BannerColorStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerColorStoreTests.swift; sourceTree = "<group>"; };
 		2FF48991B0B883572AAE4C76 /* CalendarSelectionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSelectionStoreTests.swift; sourceTree = "<group>"; };
 		474085677FF5B724D366000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -86,10 +90,13 @@
 		99B31A4A800AE12BCA853BA4 /* OverlayQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayQueueTests.swift; sourceTree = "<group>"; };
 		9A6F70A85530873BA53EB8E9 /* ReminderResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderResolverTests.swift; sourceTree = "<group>"; };
 		A759F4F6DED17D2FA2FF0C55 /* AppCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinatorTests.swift; sourceTree = "<group>"; };
+		ACB777E90336D52C33F6F14C /* SkipOnClick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipOnClick.swift; sourceTree = "<group>"; };
 		AF0675AF0FBA6B1C721BE673 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B192A1036206781CDED256B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B2C2B9408D76D1D37BA6DE84 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		B36A5D0AA3B48C5CA9D58487 /* SchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulerTests.swift; sourceTree = "<group>"; };
 		B5E8D03E953888C5ECB97EB7 /* AuthorizationCodeProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizationCodeProviding.swift; sourceTree = "<group>"; };
+		B775B07936CFE93D6C6AEC0E /* SkipOnClickStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipOnClickStoreTests.swift; sourceTree = "<group>"; };
 		BE315A67F7322EAE5E0BABCF /* FlightSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightSpeed.swift; sourceTree = "<group>"; };
 		BFEF755B3415F4DED8B9A84F /* cal-reminderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "cal-reminderTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C277F761929992254E20353C /* OverlayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPanel.swift; sourceTree = "<group>"; };
@@ -119,6 +126,7 @@
 				BE315A67F7322EAE5E0BABCF /* FlightSpeed.swift */,
 				C277F761929992254E20353C /* OverlayPanel.swift */,
 				65ADDAB2A4C8475E666864A7 /* OverlayPresenter.swift */,
+				ACB777E90336D52C33F6F14C /* SkipOnClick.swift */,
 			);
 			path = Overlay;
 			sourceTree = "<group>";
@@ -129,9 +137,11 @@
 				02BB6AA4004C6AF27AC07E36 /* AppCoordinator.swift */,
 				AF0675AF0FBA6B1C721BE673 /* AppDelegate.swift */,
 				B2C2B9408D76D1D37BA6DE84 /* AppState.swift */,
+				2A64F46A78861331E095BF0E /* cal-reminder.entitlements */,
 				88879A587631437FC5778BE3 /* Info.plist */,
 				58AC68BEBCE8DD7CE66E10F6 /* main.swift */,
 				82140EC26EEBE5F29DF1C8DA /* PollLoop.swift */,
+				B192A1036206781CDED256B0 /* PrivacyInfo.xcprivacy */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -151,6 +161,7 @@
 				99B31A4A800AE12BCA853BA4 /* OverlayQueueTests.swift */,
 				9A6F70A85530873BA53EB8E9 /* ReminderResolverTests.swift */,
 				B36A5D0AA3B48C5CA9D58487 /* SchedulerTests.swift */,
+				B775B07936CFE93D6C6AEC0E /* SkipOnClickStoreTests.swift */,
 			);
 			path = "cal-reminderTests";
 			sourceTree = "<group>";
@@ -321,6 +332,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AF1001C39CF100442AB28D0F /* Assets.xcassets in Resources */,
+				7C28FDD80C58F7BEE03C1B67 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -343,6 +355,7 @@
 				C78086DBC86ED62551ED835B /* OverlayQueueTests.swift in Sources */,
 				A7838961C6FF5F1AFA110060 /* ReminderResolverTests.swift in Sources */,
 				2BE8783C3ABBC7BF6FAF2993 /* SchedulerTests.swift in Sources */,
+				8C1CE61E80066433654C4C96 /* SkipOnClickStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -372,6 +385,7 @@
 				2E49EAB9ABB5E3E83EAE8AFE /* PollLoop.swift in Sources */,
 				0141BB9A365D36D96936EDA0 /* ReminderResolver.swift in Sources */,
 				D31AF9F47294BFBC14DDB84C /* Scheduler.swift in Sources */,
+				014C6E08FBC5CE2F3214EE40 /* SkipOnClick.swift in Sources */,
 				7F4BB18E26E346C3EF9A6A02 /* StatusMenuController.swift in Sources */,
 				C0FEB85F6F1E55759E0F825F /* Trigger.swift in Sources */,
 				3AF96DFC563615DCDD3E06D5 /* main.swift in Sources */,

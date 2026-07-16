@@ -6,10 +6,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: AppCoordinator?
     private let flightSpeedStore = UserDefaultsFlightSpeedStore()
     private let calendarSelectionStore = UserDefaultsCalendarSelectionStore()
+    private let skipOnClickStore = UserDefaultsSkipOnClickStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let overlayPresenter = OverlayPresenter(
-            animator: DefaultOverlayAnimator(speedStore: flightSpeedStore)
+            animator: DefaultOverlayAnimator(speedStore: flightSpeedStore, skipOnClickStore: skipOnClickStore)
         )
 
         let authManager = AuthManager(
@@ -52,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 coordinator?.calendarsChanged()
             },
             speedStore: flightSpeedStore,
-            calendarSelectionStore: calendarSelectionStore
+            calendarSelectionStore: calendarSelectionStore,
+            skipOnClickStore: skipOnClickStore
         )
         self.statusMenuController = statusMenuController
 

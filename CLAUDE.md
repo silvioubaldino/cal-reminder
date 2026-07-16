@@ -21,12 +21,15 @@ distributable bar on security and privacy. Single-part project (one app). Docume
 
 ## Feature workflow
 1. Read the relevant **REQ** in `docs/requirements.md` (and confirm the terms in the glossary).
-2. Write/update the **AYD** (`docs/design/AYD-NNN.md`): affected modules, the internal
+2. Capture the design in an **AYD** (`docs/design/AYD-NNN.md`): affected modules, the internal
    **interfaces/contracts**, the domain model, and the flow. The AYD is the source of the design.
+   **Never edit a past AYD** — if the design changes, write a **new AYD that supersedes/overrides**
+   the old one (`supersedes: [AYD-old]`); the old one stays frozen (see conventions §A.6).
 3. Write the **SPEC** (`docs/specs/SPEC-NNN.md`, `parents: [AYD-NNN]`): **direct and
    objective** — what to do and how (acceptance criteria + steps + tests).
 4. Implement. Non-trivial technical decision that doesn't change a feature's design →
-   **TDR** (`docs/technical_decisions/`); if it changes the design, go back to the **AYD**.
+   **TDR** (`docs/technical_decisions/`); if it changes the design, write a **new AYD that
+   supersedes** the old one (don't edit the past AYD).
 5. Log **1 line** in `docs/changelog.md` and, if the topology changed (new module/
    integration), update `docs/architecture.md` in the same PR.
 
@@ -34,6 +37,9 @@ distributable bar on security and privacy. Single-part project (one app). Docume
 - The **glossary** (in `requirements.md`) defines the canonical term in **English** —
   code and docs use that term. Add the term there **before** using it.
 - A feature's design lives in the **AYD**; the SPEC implements, it doesn't redefine.
+- **AYDs are append-only**: never rewrite a past AYD — supersede/override it with a new one
+  (`supersedes` / `superseded_by`). Only its `status`/`superseded_by` may change (like a TDR).
 - References use the plain ID (`SPEC-012`, `AYD-003`) — single-part, no `@part` suffix.
 - All docs are written in **English**.
-- Changed a living doc? Update `updated` and mark affected `children` as `status: review`.
+- Changed a **living** doc (REQ/GLO/ARCH/CONV)? Update `updated` and mark affected `children`
+  as `status: review`. (AYDs aren't living — supersede them instead, see above.)

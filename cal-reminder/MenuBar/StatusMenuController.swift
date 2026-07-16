@@ -53,10 +53,12 @@ final class StatusMenuController {
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
     private let calendarSelectionStore: CalendarSelectionStoring
+    private let skipOnClickStore: SkipOnClickStoring
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
     private var calendarsMenuItem: NSMenuItem!
     private var signOutItem: NSMenuItem!
+    private var skipOnClickItem: NSMenuItem!
     private var calendars: [CalendarInfo] = []
 
     private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
@@ -72,7 +74,8 @@ final class StatusMenuController {
         onCalendarsChanged: @escaping () -> Void = {},
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
         colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
-        calendarSelectionStore: CalendarSelectionStoring = UserDefaultsCalendarSelectionStore()
+        calendarSelectionStore: CalendarSelectionStoring = UserDefaultsCalendarSelectionStore(),
+        skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore()
     ) {
         self.onTestAnimation = onTestAnimation
         self.onToggleEnabled = onToggleEnabled
@@ -83,6 +86,7 @@ final class StatusMenuController {
         self.speedStore = speedStore
         self.colorStore = colorStore
         self.calendarSelectionStore = calendarSelectionStore
+        self.skipOnClickStore = skipOnClickStore
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "airplane",
@@ -155,6 +159,7 @@ final class StatusMenuController {
 
         menu.addItem(flightSpeedMenuItem())
         menu.addItem(bannerColorMenuItem())
+        menu.addItem(skipOnClickMenuItem())
 
         calendarsMenuItem = NSMenuItem(title: "Calendars", action: nil, keyEquivalent: "")
         calendarsMenuItem.submenu = NSMenu()
@@ -233,6 +238,21 @@ final class StatusMenuController {
         return colorMenuItem
     }
 
+    /// "Click anywhere to skip" checkbox (RF-09); checked state mirrors the store, and
+    /// unchecking it makes the Overlay click-through for the whole flight, so the
+    /// Airplane finishes its trajectory instead of being skippable.
+    private func skipOnClickMenuItem() -> NSMenuItem {
+        let item = NSMenuItem(
+            title: "Click anywhere to skip",
+            action: #selector(handleToggleSkipOnClick),
+            keyEquivalent: ""
+        )
+        item.target = self
+        item.state = skipOnClickStore.skipOnClick ? .on : .off
+        skipOnClickItem = item
+        return item
+    }
+
     /// Rebuilds the "Calendars" submenu (RF-10) from `calendars`, one checkbox each,
     /// checked when effectively selected. Called from `render(_:)` so it always reflects
     /// the latest Poll.
@@ -294,5 +314,11 @@ final class StatusMenuController {
         for (color, item) in colorItems {
             item.state = color == selected ? .on : .off
         }
+    }
+
+    @objc private func handleToggleSkipOnClick() {
+        let newValue = !skipOnClickStore.skipOnClick
+        skipOnClickStore.skipOnClick = newValue
+        skipOnClickItem.state = newValue ? .on : .off
     }
 }
