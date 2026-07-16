@@ -1,36 +1,17 @@
 import Foundation
 
-/// Google OAuth Desktop-app client credentials (AYD-001 "Google setup"). Loaded from a
-/// local JSON file the user creates once after registering the OAuth Client ID — never
-/// committed to git, never bundled with the app.
-struct GoogleOAuthConfig: Decodable {
+/// Google OAuth Desktop-app **public client** identity (AYD-003). Google does not treat an
+/// installed-app Client ID as confidential — PKCE (`code_verifier`, see `AuthManager`) is
+/// what proves the token exchange came from this app, not a secret. The Client ID therefore
+/// ships embedded in the binary; there is no per-user setup file (supersedes TDR-001, see
+/// TDR-002).
+struct GoogleOAuthConfig {
     let clientID: String
-    let clientSecret: String
-
-    enum CodingKeys: String, CodingKey {
-        case clientID = "clientId"
-        case clientSecret = "clientSecret"
-    }
 
     static let calendarReadOnlyScope = "https://www.googleapis.com/auth/calendar.readonly"
     static let userInfoEmailScope = "https://www.googleapis.com/auth/userinfo.email"
 
-    enum ConfigError: Error {
-        case missingConfigFile(URL)
-    }
-
-    static func loadFromDisk(
-        fileManager: FileManager = .default,
-        url: URL = defaultConfigURL()
-    ) throws -> GoogleOAuthConfig {
-        guard let data = fileManager.contents(atPath: url.path) else {
-            throw ConfigError.missingConfigFile(url)
-        }
-        return try JSONDecoder().decode(GoogleOAuthConfig.self, from: data)
-    }
-
-    static func defaultConfigURL() -> URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return appSupport.appendingPathComponent("cal-reminder/google-oauth-config.json")
-    }
+    /// The app's embedded OAuth Client ID. Replace with the real value from Google Cloud
+    /// Console before distributing a signed build (TDR-002); empty until then.
+    static let embedded = GoogleOAuthConfig(clientID: "")
 }
