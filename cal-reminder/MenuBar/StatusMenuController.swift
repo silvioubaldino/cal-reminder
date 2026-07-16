@@ -47,6 +47,8 @@ final class StatusMenuController {
     private let onTestAnimation: () -> Void
     private let onToggleEnabled: () -> Void
     private let onReconnect: () -> Void
+    private let onSignOut: () -> Void
+    private let onRefresh: () -> Void
     private let onCalendarsChanged: () -> Void
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
@@ -54,6 +56,7 @@ final class StatusMenuController {
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
     private var calendarsMenuItem: NSMenuItem!
+    private var signOutItem: NSMenuItem!
     private var calendars: [CalendarInfo] = []
 
     private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
@@ -64,6 +67,8 @@ final class StatusMenuController {
         onTestAnimation: @escaping () -> Void,
         onToggleEnabled: @escaping () -> Void = {},
         onReconnect: @escaping () -> Void = {},
+        onSignOut: @escaping () -> Void = {},
+        onRefresh: @escaping () -> Void = {},
         onCalendarsChanged: @escaping () -> Void = {},
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
         colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
@@ -72,6 +77,8 @@ final class StatusMenuController {
         self.onTestAnimation = onTestAnimation
         self.onToggleEnabled = onToggleEnabled
         self.onReconnect = onReconnect
+        self.onSignOut = onSignOut
+        self.onRefresh = onRefresh
         self.onCalendarsChanged = onCalendarsChanged
         self.speedStore = speedStore
         self.colorStore = colorStore
@@ -87,19 +94,40 @@ final class StatusMenuController {
     /// Reflects the coordinator's `AppState` in the menu (RF-06 status + next Trigger +
     /// RF-10 Calendars submenu).
     func render(_ state: AppState) {
-        if state.connected, let email = state.userEmail {
-            statusLabel.title = "Connected as \(email)"
-        } else {
-            statusLabel.title = state.connected ? "Connected" : "Not connected"
+        switch state.connectionStatus {
+        case .connected(let email):
+            statusLabel.title = email.map { "Connected as \($0)" } ?? "Connected"
+        case .connecting:
+            statusLabel.title = "Connecting…"
+        case .disconnected:
+            statusLabel.title = "Not connected"
+        case .needsReauth:
+            statusLabel.title = "Reconnect needed"
         }
+        signOutItem.isHidden = state.connectionStatus == .disconnected
+
         toggleItem.title = state.enabled ? "Pause" : "Resume"
 
+        // The refresh control (RF-12) only replaces the empty-state row — once a Trigger is
+        // upcoming, this row goes back to being a plain status label.
         if let next = state.nextTrigger {
             let time = DateFormatter.localizedString(from: next.startDate, dateStyle: .none, timeStyle: .short)
             nextTriggerLabel.title = "Next: \(next.eventTitle) \(time)"
+            nextTriggerLabel.image = nil
+            nextTriggerLabel.action = nil
+            nextTriggerLabel.target = nil
+        } else if state.refreshing {
+            nextTriggerLabel.title = "Refreshing…"
+            nextTriggerLabel.image = nil
+            nextTriggerLabel.action = nil
+            nextTriggerLabel.target = nil
         } else {
             nextTriggerLabel.title = "No upcoming reminders"
+            nextTriggerLabel.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")
+            nextTriggerLabel.action = #selector(handleRefresh)
+            nextTriggerLabel.target = self
         }
+        nextTriggerLabel.isEnabled = state.nextTrigger == nil && !state.refreshing
 
         calendars = state.calendars
         rebuildCalendarsSubmenu()
@@ -110,7 +138,6 @@ final class StatusMenuController {
 
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
-        nextTriggerLabel.isEnabled = false
         menu.addItem(nextTriggerLabel)
         menu.addItem(.separator())
 
@@ -140,6 +167,15 @@ final class StatusMenuController {
         )
         reconnectItem.target = self
         menu.addItem(reconnectItem)
+
+        signOutItem = NSMenuItem(
+            title: "Sign out of Google",
+            action: #selector(handleSignOut),
+            keyEquivalent: ""
+        )
+        signOutItem.target = self
+        signOutItem.isHidden = true
+        menu.addItem(signOutItem)
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
@@ -234,6 +270,14 @@ final class StatusMenuController {
 
     @objc private func handleReconnect() {
         onReconnect()
+    }
+
+    @objc private func handleSignOut() {
+        onSignOut()
+    }
+
+    @objc private func handleRefresh() {
+        onRefresh()
     }
 
     @objc private func handleSelectSpeed(_ sender: NSMenuItem) {

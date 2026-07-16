@@ -5,7 +5,9 @@ private final class FakeAuthManaging: AuthManaging {
     var isConnected = false
     var connectError: Error?
     var email: String? = "user@example.com"
+    var userEmailError: Error?
     private(set) var connectCallCount = 0
+    private(set) var disconnectCallCount = 0
 
     func connect() async throws {
         connectCallCount += 1
@@ -20,8 +22,14 @@ private final class FakeAuthManaging: AuthManaging {
     }
 
     func userEmail() async throws -> String {
+        if let userEmailError { throw userEmailError }
         guard let email else { throw AuthError.notConnected }
         return email
+    }
+
+    func disconnect() async {
+        disconnectCallCount += 1
+        isConnected = false
     }
 }
 
@@ -93,7 +101,7 @@ final class AppCoordinatorTests: XCTestCase {
         )
     }
 
-    func test_startReflectsAuthConnectionStatus() {
+    func test_startWithStoredTokenBeginsConnecting() {
         // Arrange
         let auth = FakeAuthManaging()
         auth.isConnected = true
@@ -102,8 +110,52 @@ final class AppCoordinatorTests: XCTestCase {
         // Act
         coordinator.start()
 
+        // Assert: synchronous transition, before the async verification call completes.
+        XCTAssertEqual(coordinator.state.connectionStatus, .connecting)
+    }
+
+    func test_startWithNoStoredTokenIsDisconnected() {
+        // Arrange
+        let coordinator = makeCoordinator()
+
+        // Act
+        coordinator.start()
+
         // Assert
-        XCTAssertTrue(coordinator.state.connected)
+        XCTAssertEqual(coordinator.state.connectionStatus, .disconnected)
+    }
+
+    func test_startWithValidSessionVerifiesAndFetchesEmail() async throws {
+        // Arrange
+        let auth = FakeAuthManaging()
+        auth.isConnected = true
+        auth.email = "user@example.com"
+        let coordinator = makeCoordinator(auth: auth)
+
+        // Act
+        coordinator.start()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
+    }
+
+    func test_startWithRevokedTokenBecomesNeedsReauth() async throws {
+        // Arrange: a truly revoked token fails every authenticated call it touches — both
+        // the startup verification and the concurrent background Poll.
+        let auth = FakeAuthManaging()
+        auth.isConnected = true
+        auth.userEmailError = AuthError.refreshTokenRevoked
+        let calendar = FakeCalendarServicing()
+        calendar.error = AuthError.refreshTokenRevoked
+        let coordinator = makeCoordinator(auth: auth, calendar: calendar)
+
+        // Act
+        coordinator.start()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(coordinator.state.connectionStatus, .needsReauth)
     }
 
     func test_successfulPollUpdatesStateAndForwardsToScheduler() async {
@@ -118,7 +170,7 @@ final class AppCoordinatorTests: XCTestCase {
         await coordinator.poll()
 
         // Assert
-        XCTAssertTrue(coordinator.state.connected)
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
         XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
         XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
     }
@@ -141,19 +193,34 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
     }
 
-    func test_failedPollKeepsConnectedAtAuthIsConnected() async {
-        // Arrange
-        let auth = FakeAuthManaging()
-        auth.isConnected = true
+    func test_pollNetworkFailureKeepsSessionConnected() async {
+        // Arrange: a successful Poll first establishes a connected session.
         let calendar = FakeCalendarServicing()
-        calendar.error = URLError(.notConnectedToInternet)
-        let coordinator = makeCoordinator(auth: auth, calendar: calendar)
+        let coordinator = makeCoordinator(calendar: calendar)
+        await coordinator.poll()
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
 
-        // Act
+        // Act: a transient network failure must not drop the session (RNF-04).
+        calendar.error = URLError(.notConnectedToInternet)
         await coordinator.poll()
 
         // Assert
-        XCTAssertTrue(coordinator.state.connected)
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
+    }
+
+    func test_pollAuthRevokedDropsToNeedsReauth() async {
+        // Arrange: a successful Poll first establishes a connected session.
+        let calendar = FakeCalendarServicing()
+        let coordinator = makeCoordinator(calendar: calendar)
+        await coordinator.poll()
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
+
+        // Act
+        calendar.error = AuthError.refreshTokenRevoked
+        await coordinator.poll()
+
+        // Assert
+        XCTAssertEqual(coordinator.state.connectionStatus, .needsReauth)
     }
 
     func test_toggleEnabledFlipsStateAndCallsScheduler() async throws {
@@ -172,21 +239,6 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(scheduler.enabledCalls, [false])
     }
 
-    func test_startFetchesConnectedUserEmail() async throws {
-        // Arrange
-        let auth = FakeAuthManaging()
-        auth.isConnected = true
-        auth.email = "user@example.com"
-        let coordinator = makeCoordinator(auth: auth)
-
-        // Act
-        coordinator.start()
-        try await Task.sleep(nanoseconds: 20_000_000)
-
-        // Assert
-        XCTAssertEqual(coordinator.state.userEmail, "user@example.com")
-    }
-
     func test_reconnectCallsAuthConnectThenPolls() async throws {
         // Arrange
         let auth = FakeAuthManaging()
@@ -200,7 +252,7 @@ final class AppCoordinatorTests: XCTestCase {
         // Assert
         XCTAssertEqual(auth.connectCallCount, 1)
         XCTAssertEqual(calendar.pollCallCount, 1)
-        XCTAssertTrue(coordinator.state.connected)
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
     }
 
     func test_wakeCancelsSchedulerBeforeRePolling() async {
@@ -248,5 +300,41 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(scheduler.cancelAllCallCount, 1)
         XCTAssertEqual(calendar.pollCallCount, 1)
         XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+    }
+
+    func test_refreshNowTriggersPollAndTogglesRefreshingFlag() async throws {
+        // Arrange (RF-12: manual Poll from the empty state)
+        let calendar = FakeCalendarServicing()
+        let coordinator = makeCoordinator(calendar: calendar)
+
+        // Act
+        coordinator.refreshNow()
+
+        // Assert: flips true synchronously, then clears once the Poll completes.
+        XCTAssertTrue(coordinator.state.refreshing)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(coordinator.state.refreshing)
+        XCTAssertEqual(calendar.pollCallCount, 1)
+    }
+
+    func test_logoutCancelsTriggersDisconnectsAndClearsSession() async throws {
+        // Arrange
+        let calendar = FakeCalendarServicing()
+        calendar.triggers = [trigger(id: "evt1#5", minutesFromNow: 5)]
+        let scheduler = FakeScheduler()
+        let auth = FakeAuthManaging()
+        let coordinator = makeCoordinator(auth: auth, calendar: calendar, scheduler: scheduler)
+        await coordinator.poll()
+        XCTAssertNotNil(coordinator.state.nextTrigger)
+
+        // Act
+        coordinator.logout()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(auth.disconnectCallCount, 1)
+        XCTAssertEqual(coordinator.state.connectionStatus, .disconnected)
+        XCTAssertNil(coordinator.state.nextTrigger)
     }
 }

@@ -14,6 +14,10 @@ private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     /// Calendar ids that always fail (e.g. access revoked mid-flight) — simulates a
     /// persistently broken Calendar that must not take down the whole Poll.
     var alwaysFail: Set<String> = []
+    /// Calendar ids whose call fails because the session's refresh token is dead — unlike
+    /// `alwaysFail`, this must propagate out of `poll()` instead of being skipped, since
+    /// it's the whole session that's broken, not just this one Calendar (SPEC-010).
+    var authRevokedFor: Set<String> = []
 
     private(set) var receivedCalendarIds: [String] = []
     private(set) var receivedSyncTokens: [String?] = []
@@ -25,6 +29,9 @@ private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     func listEvents(calendarId: String, timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?) {
         receivedCalendarIds.append(calendarId)
         receivedSyncTokens.append(syncToken)
+        if authRevokedFor.contains(calendarId) {
+            throw AuthError.refreshTokenRevoked
+        }
         if alwaysFail.contains(calendarId) {
             throw GoogleCalendarAPIError.unexpectedStatus(403)
         }
@@ -295,6 +302,24 @@ final class CalendarServiceTests: XCTestCase {
 
         // Assert
         XCTAssertEqual(triggers.map(\.id), ["A#evt-a#10"])
+    }
+
+    func test_authRevokedErrorPropagatesOutOfPoll() async throws {
+        // Arrange: a dead refresh token breaks the whole session, not just one Calendar —
+        // must propagate (unlike `test_oneCalendarFailingDoesNotFailTheWholePoll`).
+        let api = StubGoogleCalendarAPI()
+        api.authRevokedFor = ["primary"]
+        let service = CalendarService(api: api, selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
+
+        // Act / Assert
+        do {
+            _ = try await service.poll()
+            XCTFail("expected AuthError.refreshTokenRevoked to propagate")
+        } catch AuthError.refreshTokenRevoked {
+            // expected
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
     }
 
     func test_availableCalendarsMapsListCalendarsToDomainType() async throws {

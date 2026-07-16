@@ -232,4 +232,71 @@ final class AuthManagerTests: XCTestCase {
             XCTFail("unexpected error: \(error)")
         }
     }
+
+    func test_accessToken_refreshWithInvalidGrantClearsTokenAndThrowsRevoked() async {
+        // Arrange (SPEC-010: a dead refresh token must be cleared, not just fail loudly)
+        let tokenStore = FakeTokenStore(initialToken: "refresh-1")
+        let errorBody = try! JSONSerialization.data(withJSONObject: ["error": "invalid_grant"])
+        let httpClient = StubHTTPClient(responses: [(errorBody, httpResponse(status: 400))])
+        let manager = AuthManager(
+            config: config,
+            tokenStore: tokenStore,
+            httpClient: httpClient,
+            authorizationCodeProvider: StubAuthorizationCodeProvider()
+        )
+
+        // Act / Assert
+        do {
+            _ = try await manager.accessToken()
+            XCTFail("expected refreshTokenRevoked to be thrown")
+        } catch AuthError.refreshTokenRevoked {
+            // expected
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        XCTAssertNil(tokenStore.refreshToken(), "a revoked refresh token must be cleared from storage")
+        XCTAssertFalse(manager.isConnected)
+    }
+
+    func test_accessToken_refreshFailureWithOtherErrorKeepsTokenAndThrowsTokenExchangeFailed() async {
+        // Arrange: a transient/server failure (not invalid_grant) must not be treated as a
+        // dead session (RNF-04) — the refresh token stays intact for the next attempt.
+        let tokenStore = FakeTokenStore(initialToken: "refresh-1")
+        let httpClient = StubHTTPClient(responses: [(Data(), httpResponse(status: 500))])
+        let manager = AuthManager(
+            config: config,
+            tokenStore: tokenStore,
+            httpClient: httpClient,
+            authorizationCodeProvider: StubAuthorizationCodeProvider()
+        )
+
+        // Act / Assert
+        do {
+            _ = try await manager.accessToken()
+            XCTFail("expected tokenExchangeFailed to be thrown")
+        } catch AuthError.tokenExchangeFailed {
+            // expected
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        XCTAssertEqual(tokenStore.refreshToken(), "refresh-1", "a transient failure must not clear the refresh token")
+    }
+
+    func test_disconnect_clearsStoredToken() async {
+        // Arrange
+        let tokenStore = FakeTokenStore(initialToken: "refresh-1")
+        let manager = AuthManager(
+            config: config,
+            tokenStore: tokenStore,
+            httpClient: StubHTTPClient(responses: []),
+            authorizationCodeProvider: StubAuthorizationCodeProvider()
+        )
+
+        // Act
+        await manager.disconnect()
+
+        // Assert
+        XCTAssertNil(tokenStore.refreshToken())
+        XCTAssertFalse(manager.isConnected)
+    }
 }

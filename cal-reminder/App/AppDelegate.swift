@@ -42,6 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onReconnect: { [weak coordinator] in
                 coordinator?.reconnect()
             },
+            onSignOut: { [weak coordinator] in
+                coordinator?.logout()
+            },
+            onRefresh: { [weak coordinator] in
+                coordinator?.refreshNow()
+            },
             onCalendarsChanged: { [weak coordinator] in
                 coordinator?.calendarsChanged()
             },

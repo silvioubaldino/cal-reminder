@@ -1,6 +1,6 @@
 import Foundation
 
-/// Repeats an async action on a fixed interval (~120s Poll per AYD-001) until stopped.
+/// Repeats an async action on a fixed interval (5 min Poll per SPEC-010) until stopped.
 @MainActor
 final class PollLoop {
     private let interval: TimeInterval
@@ -10,7 +10,7 @@ final class PollLoop {
     /// it can capture `self` in the poll closure.
     var onPoll: (() async -> Void)?
 
-    init(interval: TimeInterval = 120) {
+    init(interval: TimeInterval = 300) {
         self.interval = interval
     }
 

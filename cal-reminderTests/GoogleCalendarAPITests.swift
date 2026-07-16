@@ -11,6 +11,7 @@ private final class FakeAuthManaging: AuthManaging {
     func connect() async throws {}
     func accessToken() async throws -> String { "access-token" }
     func userEmail() async throws -> String { "user@example.com" }
+    func disconnect() async {}
 
     func authorizedRequest(_ makeRequest: (String) -> URLRequest) async throws -> (Data, HTTPURLResponse) {
         lastRequest = makeRequest("access-token")

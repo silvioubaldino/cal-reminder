@@ -19,7 +19,7 @@ final class AppCoordinator {
         calendar: CalendarServicing,
         scheduler: Scheduling,
         overlay: OverlayPresenter,
-        pollInterval: TimeInterval = 120
+        pollInterval: TimeInterval = 300
     ) {
         self.auth = auth
         self.calendar = calendar
@@ -30,10 +30,10 @@ final class AppCoordinator {
     }
 
     func start() {
-        state.connected = auth.isConnected
+        state.connectionStatus = auth.isConnected ? .connecting : .disconnected
         notify()
         Task {
-            await refreshUserEmail()
+            await verifySession()
             notify()
         }
         pollLoop.start()
@@ -56,11 +56,30 @@ final class AppCoordinator {
     func reconnect() {
         Task {
             try? await auth.connect()
-            state.connected = auth.isConnected
-            await refreshUserEmail(force: true)
+            await verifySession()
             notify()
             await poll()
         }
+    }
+
+    /// Disconnects the Google account (RF-06 "Sign out of Google"): cancels every armed
+    /// Trigger, clears the stored token, and resets to `.disconnected`.
+    func logout() {
+        Task {
+            await scheduler.cancelAll()
+            await auth.disconnect()
+            state.connectionStatus = .disconnected
+            state.nextTrigger = nil
+            notify()
+        }
+    }
+
+    /// Manual Poll (RF-12) from the empty-state menu row: sets `refreshing` for the duration.
+    func refreshNow() {
+        guard !state.refreshing else { return }
+        state.refreshing = true
+        notify()
+        Task { await poll() }
     }
 
     func testAnimation() {
@@ -82,17 +101,22 @@ final class AppCoordinator {
         do {
             let triggers = try await calendar.poll()
             await scheduler.schedule(triggers)
-            state.connected = true
+            state.connectionStatus = .connected(email: currentEmail)
             // Not `triggers.min(...)`: incremental Polls (RNF-06) only report Events that
             // changed since the last sync, so a still-upcoming, unchanged Trigger can be
             // absent from this Poll's list — the Scheduler holds the accumulated truth.
             state.nextTrigger = await scheduler.nextArmedTrigger()
             state.calendars = (try? await calendar.availableCalendars()) ?? state.calendars
-            await refreshUserEmail()
+            await refreshUserEmailIfNeeded()
+        } catch AuthError.refreshTokenRevoked {
+            print("[AppCoordinator] poll failed: refresh token revoked — needs reauth")
+            state.connectionStatus = .needsReauth
         } catch {
             print("[AppCoordinator] poll failed: \(error)")
-            state.connected = auth.isConnected
+            // Network/transient failure: leave the current status untouched (RNF-04) — only
+            // an auth-fatal error (above) drops the session.
         }
+        state.refreshing = false
         notify()
     }
 
@@ -103,7 +127,7 @@ final class AppCoordinator {
     }
 
     /// A Calendar-selection change (RF-10): re-arm from a fresh Poll immediately, mirroring
-    /// `handleWake()`, instead of waiting for the ~120s PollLoop.
+    /// `handleWake()`, instead of waiting for the PollLoop.
     func calendarsChanged() {
         Task {
             await scheduler.cancelAll()
@@ -111,16 +135,36 @@ final class AppCoordinator {
         }
     }
 
-    /// Fetches the connected account's email into `state.userEmail` (RF-06). Skipped
-    /// when already cached unless `force` (e.g. after a reconnect, which may switch
-    /// accounts), and cleared when not connected.
-    private func refreshUserEmail(force: Bool = false) async {
-        guard state.connected else {
-            state.userEmail = nil
+    private var currentEmail: String? {
+        if case .connected(let email) = state.connectionStatus { return email }
+        return nil
+    }
+
+    /// Verifies the stored session with a real authenticated call (startup / reconnect):
+    /// resolves to `.connected(email)` or `.needsReauth`. A network error at verification
+    /// time leaves the status as-is (`.connecting`/previous), since a flaky connection at
+    /// launch isn't proof the session is dead — the next Poll will resolve it either way.
+    private func verifySession() async {
+        guard auth.isConnected else {
+            state.connectionStatus = .disconnected
             return
         }
-        guard force || state.userEmail == nil else { return }
-        state.userEmail = try? await auth.userEmail()
+        do {
+            let email = try await auth.userEmail()
+            state.connectionStatus = .connected(email: email)
+        } catch AuthError.refreshTokenRevoked {
+            state.connectionStatus = .needsReauth
+        } catch {
+            print("[AppCoordinator] session verification failed: \(error)")
+        }
+    }
+
+    /// Fetches the connected account's email into state once (RF-06) — skipped once cached.
+    private func refreshUserEmailIfNeeded() async {
+        guard case .connected(let email) = state.connectionStatus, email == nil else { return }
+        if let email = try? await auth.userEmail() {
+            state.connectionStatus = .connected(email: email)
+        }
     }
 
     private func notify() {

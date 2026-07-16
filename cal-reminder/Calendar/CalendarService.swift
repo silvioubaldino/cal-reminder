@@ -45,6 +45,10 @@ final class CalendarService: CalendarServicing {
         for calendarId in selectedIds {
             do {
                 triggers += try await pollTriggers(calendarId: calendarId, retryOnExpiredToken: true)
+            } catch AuthError.refreshTokenRevoked {
+                // The session itself is dead, not just this Calendar — propagate so the
+                // AppCoordinator can drop to `.needsReauth` instead of silently skipping it.
+                throw AuthError.refreshTokenRevoked
             } catch {
                 print("[poll] Calendar '\(calendarId)' failed: \(error) — skipping it for this Poll")
             }
