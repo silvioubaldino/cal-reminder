@@ -121,6 +121,7 @@ actor AuthManager: AuthManaging {
         try await requestToken(params: [
             "code": code,
             "client_id": config.clientID,
+            "client_secret": config.clientSecret,
             "redirect_uri": redirectURI,
             "grant_type": "authorization_code",
             "code_verifier": verifier
@@ -131,6 +132,7 @@ actor AuthManager: AuthManaging {
         try await requestToken(params: [
             "refresh_token": refreshToken,
             "client_id": config.clientID,
+            "client_secret": config.clientSecret,
             "grant_type": "refresh_token"
         ])
     }

@@ -58,7 +58,7 @@ private func tokenResponseData(accessToken: String, refreshToken: String? = nil,
 }
 
 final class AuthManagerTests: XCTestCase {
-    private let config = GoogleOAuthConfig(clientID: "client-id")
+    private let config = GoogleOAuthConfig(clientID: "client-id", clientSecret: "client-secret")
 
     func test_isConnected_falseWithoutRefreshToken() {
         // Arrange
@@ -189,7 +189,7 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertEqual(email, "user@example.com")
     }
 
-    func test_connect_tokenExchangeCarriesNoClientSecret() async throws {
+    func test_connect_tokenExchangeCarriesClientCredentialsAndPKCE() async throws {
         // Arrange
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
@@ -207,8 +207,9 @@ final class AuthManagerTests: XCTestCase {
         // Assert
         let sentRequests = await httpClient.sentRequests
         let body = String(data: sentRequests[0].httpBody ?? Data(), encoding: .utf8) ?? ""
-        XCTAssertFalse(body.contains("client_secret"), "a public client must not send a client_secret")
-        XCTAssertTrue(body.contains("code_verifier="), "PKCE code_verifier must prove the exchange instead")
+        // Google's installed-app token endpoint requires client_secret alongside PKCE (TDR-002).
+        XCTAssertTrue(body.contains("client_secret=client-secret"), "Google requires client_secret on the exchange")
+        XCTAssertTrue(body.contains("code_verifier="), "PKCE code_verifier must also be present")
         XCTAssertTrue(body.contains("client_id=client-id"))
     }
 

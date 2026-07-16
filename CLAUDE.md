@@ -1,8 +1,10 @@
 # cal-reminder — AI guide
 
-Native **macOS** app (personal, local use) that connects to Google Calendar and flies a
-little airplane pulling a banner across the screen — over all windows — at each event's
-reminder time. Single-part project (one app). Documentation is **spec-driven** and lean.
+Native **macOS** app that connects to Google Calendar and flies a little airplane pulling a
+banner across the screen — over all windows — at each event's reminder time. It is built to
+be **distributed** (Mac App Store) and **sold** — a commercial product, held to a
+distributable bar on security and privacy. Single-part project (one app). Documentation is
+**spec-driven** and lean.
 
 ## Start here
 - @docs/requirements.md — requirements **and glossary** (ALWAYS use these terms)

@@ -11,8 +11,10 @@ related: [GLO]
 
 # Requirements
 
-> Personal, local-use macOS app that connects to Google Calendar and flies an airplane
-> pulling a banner across the screen at each event's reminder time. Keep it lean.
+> macOS app that connects to Google Calendar and flies an airplane pulling a banner across
+> the screen at each event's reminder time. It is built to be **distributed** (Mac App Store)
+> and **sold** — a commercial product, not a personal/local-only tool. Keep it lean, but hold
+> it to a distributable bar on security and privacy (RNF-05, RNF-08, RNF-10).
 
 ## Functional (RF)
 | ID | Requirement | Priority | Acceptance criterion |
@@ -35,11 +37,12 @@ related: [GLO]
 | RNF-02 | Overlay behavior | The Overlay never steals focus, and appears above everything; it is click-through except while a Reminder animation is playing, when a click skips it (RF-09) | Shows over fullscreen apps and all Spaces; clicks pass through to the window below when idle; never activates the app or takes key focus, even mid-flight |
 | RNF-03 | Precision | The Trigger fires close to the computed time | Error < 5 s from the computed fire time |
 | RNF-04 | Resilience | Tolerant to sleep/wake and network loss | Re-syncs on wake; keeps scheduled Triggers across transient network failures |
-| RNF-05 | Security | Secrets are stored securely | Tokens only in the macOS Keychain, never in plaintext on disk |
+| RNF-05 | Security | The **user's** secrets are stored securely | The connected account's OAuth access/refresh tokens live only in the macOS Keychain, never in plaintext on disk |
 | RNF-06 | Network | Efficient calendar sync | Incremental poll using `syncToken` |
 | RNF-07 | Distribution | Distributable through the Mac App Store, and testable by App Review | App Sandbox enabled and signed with a real Team; App Review can connect and exercise the app with a demo Google account, without creating any Google Cloud credentials (AYD-003) |
 | RNF-08 | Privacy compliance | Declares data collection/use to Apple and Google | Ships a privacy manifest (`PrivacyInfo.xcprivacy`) and a public privacy-policy URL; the `calendar.readonly` restricted scope passes Google verification (AYD-005) |
 | RNF-09 | Quality gate | Every change is built, tested, and linted automatically | CI builds the app, runs the test suite, and lints the sources on each push/PR; a failure blocks the merge (AYD-004) |
+| RNF-10 | Security (app credential) | The **app's** OAuth client secret is not exposed in the distributed binary | Target: the OAuth token exchange/refresh runs behind an app-owned backend (token broker) so the client secret ships only on the server; the app authenticates to that backend instead of carrying the secret. Planned, not yet built — the interim embedded-secret state is documented in TDR-003 (AYD-003) |
 
 ## Business rules
 - RN-01: Only timed Events generate Triggers; all-day Events are ignored.
@@ -54,11 +57,18 @@ related: [GLO]
 - **Out (for now):** actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed, Banner color, and Calendar selection presets (e.g. custom colors, banner size); multiple Google accounts; all-day Events; multi-monitor targeting beyond the main screen.
 
 ## Post-MVP: App Store readiness (planned)
-Distribution/notarization was originally out of MVP; it is now scoped (not yet built) across three
-independent AYDs so each has a defined boundary: **AYD-003** (Mac App Store distribution & OAuth
-rearchitecture — RNF-07), **AYD-005** (App Sandbox & privacy compliance artifacts — RNF-08), and
-**AYD-004** (CI & code-quality gate — RNF-09). AYD-004 can land on its own; AYD-003 depends on the
-entitlements defined in AYD-005.
+The app is intended for **public distribution and eventual sale**, so App Store readiness and a
+distributable security posture are in scope (not yet all built), across independent AYDs so each
+has a defined boundary: **AYD-003** (Mac App Store distribution & OAuth rearchitecture — RNF-07),
+**AYD-005** (App Sandbox & privacy compliance artifacts — RNF-08), and **AYD-004** (CI &
+code-quality gate — RNF-09). AYD-004 can land on its own; AYD-003 depends on the entitlements
+defined in AYD-005.
+
+Because the app is distributed rather than personal, the OAuth **client secret** must not remain
+embedded in the shipped binary: hardening it behind an app-owned token broker is now a target
+(**RNF-10**, owned by AYD-003). The current embedded-secret build (TDR-003) is the interim state
+that makes sign-in work today; RNF-10 is the direction, to be realized by a future TDR — it does
+not retract TDR-003, it succeeds it.
 
 ---
 

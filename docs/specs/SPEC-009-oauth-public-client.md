@@ -1,18 +1,25 @@
 ---
 id: SPEC-009
 type: spec
-status: draft
+status: done
 parents: [AYD-003]
-related: [GLO, TDR-001, TDR-002]
+related: [GLO, TDR-001, TDR-002, TDR-003]
 updated: 2026-07-16
 ---
 
 # SPEC-009: Embedded OAuth public client — what + how
 
 > Rearchitects `AuthManager`/`GoogleOAuthConfig` off the per-user, on-disk client
-> credentials file (TDR-001) onto a single embedded OAuth **public client** (TDR-002).
+> credentials file (TDR-001) onto a single embedded OAuth client (TDR-002).
 > Closes the structural half of RNF-07: distribution and App Review no longer depend on a
 > reviewer creating Google Cloud credentials. Implements AYD-003; doesn't redefine it.
+
+> **Post-implementation correction ([[TDR-003]]).** As written below, this SPEC dropped
+> `client_secret` on the assumption Google's installed-app token endpoint accepts PKCE alone.
+> It does not — Google rejects the exchange and refresh with "client_secret is missing", so
+> login silently failed. The fix keeps everything here **except** that `GoogleOAuthConfig`
+> embeds `clientSecret` too and `AuthManager` sends `client_secret` on both grants (alongside
+> PKCE). Read every "no/drop `client_secret`" statement below as superseded by TDR-003.
 
 ## What (goal)
 Replace `GoogleOAuthConfig.loadFromDisk()` with an embedded, public Client ID compiled into

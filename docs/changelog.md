@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-07-15
+updated: 2026-07-16
 ---
 
 # Changelog
@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Reframed the project scope from "personal, local-use" to a distributed, commercial product, and added RNF-10: the app's OAuth client secret should live behind an app-owned token broker rather than embedded in the shipped binary (planned; the interim embedded-secret state stays documented in TDR-003).
+- Fixed Google sign-in: the embedded OAuth client now sends the client secret Google requires for installed apps, so connecting actually completes and the account email, Calendars, and next Event appear (TDR-003 supersedes TDR-002).
 - Implemented SPEC-006: Events with no popup Reminder configured now get a default 5-minutes-before alert; Events that already have one keep only their own.
 - Implemented SPEC-009: replaced the per-user, on-disk Google OAuth credentials with a single embedded public client, so the app no longer needs a manually-created credentials file to connect, needed for App Review.
 - Implemented SPEC-008: App Sandbox entitlements, a privacy manifest, a full app icon, real bundle metadata, and a public privacy policy, needed for the Mac App Store.

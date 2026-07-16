@@ -2,7 +2,7 @@
 id: AYD-001
 type: design
 status: draft
-updated: 2026-07-11
+updated: 2026-07-16
 parents: [REQ-01]
 children: [SPEC-001, SPEC-002, SPEC-003, SPEC-004, SPEC-006]  # generated per implementation slice (M1–M3, Flight Speed, default Reminder)
 related: [GLO]
@@ -15,7 +15,7 @@ related: [GLO]
 > the screen, over all windows. Source of the design — the SPECs implement it.
 
 ## Goal
-Meet **REQ-01 / RF-01..RF-06**: a personal, local macOS menu bar app that reads timed
+Meet **REQ-01 / RF-01..RF-06**: a macOS menu bar app that reads timed
 Events from Google Calendar and, at `Event start − Reminder minutes`, shows a click-through
 Overlay of an Airplane pulling a Banner reading `<Title> at HH:MM (in X min)`, above every
 window (including fullscreen). Inspiration: the `conniecodes` reel.

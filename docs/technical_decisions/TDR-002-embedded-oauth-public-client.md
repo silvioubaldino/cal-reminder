@@ -2,17 +2,22 @@
 id: TDR-002
 type: tdr
 title: Embedded OAuth public client (no client secret)
-status: accepted
+status: superseded
 updated: 2026-07-16
 parents: [SPEC-009]
-related: [AYD-003, TDR-001]
-superseded_by: null
+related: [AYD-003, TDR-001, TDR-003]
+superseded_by: TDR-003
 ---
 
 # TDR-002: Embedded OAuth public client (no client secret)
 
 > Append-only: never rewrite. A new decision = a new TDR that supersedes this one
 > (`superseded_by`). Supersedes **TDR-001**.
+>
+> **Superseded by [[TDR-003]]:** this TDR's core premise — that Google's installed-app token
+> endpoint works with PKCE and *no* `client_secret` — is factually wrong; Google rejects the
+> exchange and refresh with "client_secret is missing." TDR-003 re-adds the embedded
+> `client_secret` while keeping the embedded, no-disk-file model.
 
 ## Context
 TDR-001 had `AuthManager` load a per-user `clientId`/`clientSecret` JSON file from

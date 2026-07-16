@@ -1,11 +1,11 @@
 ---
 id: AYD-003
 type: design
-status: approved
+status: review
 updated: 2026-07-16
-parents: [RNF-07, REQ-01]
+parents: [RNF-07, RNF-10, REQ-01]
 children: [SPEC-009]
-related: [GLO, AYD-001, TDR-001, TDR-002]
+related: [GLO, AYD-001, TDR-001, TDR-002, TDR-003]
 ---
 
 # AYD-003: Mac App Store distribution & OAuth rearchitecture
@@ -23,9 +23,16 @@ Meet **RNF-07** (and revisit **RF-01**): ship a build that App Review can instal
 exercise **with a demo Google account, without the reviewer creating any Google Cloud
 credentials**, while keeping the OAuth connection read-only and the token in the Keychain.
 This requires replacing `GoogleOAuthConfig.loadFromDisk()` (TDR-001) with a single,
-app-owned OAuth **public client** whose Client ID ships with the app, and driving the
-Google **restricted-scope** (`calendar.readonly`) verification that a publicly distributed
-app requires.
+app-owned OAuth **installed-app client** whose credentials ship embedded in the app, and
+driving the Google **restricted-scope** (`calendar.readonly`) verification that a publicly
+distributed app requires.
+
+> **Correction (see [[TDR-003]]).** The rows and snippets below describe the design as
+> SPEC-009 shipped it — an embedded client with **no `client_secret`**. That premise is
+> wrong for Google: its token endpoint requires `client_secret` on installed-app clients even
+> with PKCE. The embedded, no-disk-file model stays; the secret is re-added. Where the text
+> below says "no secret", read it as "`client_id` **and** `client_secret` embedded, plus
+> PKCE" (TDR-003 supersedes TDR-002).
 
 ## Affected modules
 | Module | Role in this feature | Generated SPEC |
@@ -95,6 +102,14 @@ sequenceDiagram
 - **Google restricted-scope verification is a hard dependency, not a code change.** A public
   app using `calendar.readonly` must pass Google's OAuth verification (brand config, scope
   justification, possibly a CASA security assessment) before it leaves "testing" mode.
+- **Client-secret protection is the planned end state (RNF-10), embedding is interim.** Google's
+  installed-app token endpoint requires the `client_secret` (TDR-003 corrected the earlier
+  "no secret" premise), so the shipping build embeds it. Because the app is **distributed and
+  commercial**, embedding is only the interim state: the target is an **app-owned token broker**
+  — a small backend that holds the real `client_secret` and performs the code exchange and
+  refresh on the app's behalf, so the secret never ships in the binary. This also gates API
+  quota and consent-screen branding to the vendor, and lets the secret rotate without a new
+  release. To be realized by a **future TDR that succeeds TDR-003** (it does not retract it).
 
 ## Out of scope / open questions
 - **Out:** entitlements file, privacy manifest, icon, Info.plist metadata (→ **AYD-005**); CI
@@ -105,3 +120,7 @@ sequenceDiagram
 - **Open — Google verification timeline:** verification can take weeks and may require a privacy
   policy (AYD-005) and a homepage; sequence it **before** App Store submission.
 - **Open — bundle id / Team:** needs a paid Apple Developer account and a real `DEVELOPMENT_TEAM`.
+- **Open — token broker (RNF-10):** where the backend runs, how the app authenticates to it, and
+  how it survives the broker being offline (fall back to a cached refresh, or fail closed). Scope
+  a dedicated SPEC + succeeding TDR when this is picked up; until then the embedded secret
+  (TDR-003) stands.
