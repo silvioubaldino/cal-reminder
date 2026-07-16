@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-008: App Sandbox entitlements, a privacy manifest, a full app icon, real bundle metadata, and a public privacy policy, needed for the Mac App Store.
 - Implemented SPEC-007: a CI gate that builds, tests, and lints (SwiftLint) every push and pull request, blocking the merge on failure.
 - Designed AYD-005: App Sandbox and privacy compliance artifacts (entitlements, privacy manifest, app icon, bundle metadata, privacy policy) needed for the Mac App Store.
 - Designed AYD-004: an automated CI gate that builds, tests, and lints every push and pull request.

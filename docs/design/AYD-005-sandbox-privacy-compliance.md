@@ -1,11 +1,11 @@
 ---
 id: AYD-005
 type: design
-status: draft
-updated: 2026-07-15
+status: approved
+updated: 2026-07-16
 parents: [RNF-08, RNF-05]
 related: [GLO, AYD-003]
-children: []
+children: [SPEC-008]
 ---
 
 # AYD-005: App Sandbox & privacy compliance artifacts
