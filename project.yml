@@ -25,12 +25,15 @@ targets:
         CFBundleDisplayName: cal-reminder
         CFBundleShortVersionString: "0.1"
         CFBundleVersion: "1"
-        NSHumanReadableCopyright: ""
+        NSHumanReadableCopyright: "© 2026 Silvio Ubaldino"
         NSPrincipalClass: NSApplication
+        LSApplicationCategoryType: public.app-category.productivity
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.silvioubaldino.cal-reminder
-        ENABLE_HARDENED_RUNTIME: false
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_ENTITLEMENTS: cal-reminder/App/cal-reminder.entitlements
         GENERATE_INFOPLIST_FILE: false
 
   cal-reminderTests:
