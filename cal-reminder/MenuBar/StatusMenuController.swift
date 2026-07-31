@@ -63,6 +63,7 @@ final class StatusMenuController {
 
     private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
     private let nextTriggerLabel = NSMenuItem(title: "No upcoming reminders", action: nil, keyEquivalent: "")
+    private let refreshItem = NSMenuItem(title: "Refresh now", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
 
     init(
@@ -112,26 +113,19 @@ final class StatusMenuController {
 
         toggleItem.title = state.enabled ? "Pause" : "Resume"
 
-        // The refresh control (RF-12) only replaces the empty-state row — once a Trigger is
-        // upcoming, this row goes back to being a plain status label.
+        // A plain status row — never clickable; the "Refresh now" item below is the only
+        // manual-refresh control (RF-12), and it stays available regardless of this text.
         if let next = state.nextTrigger {
             let time = DateFormatter.localizedString(from: next.startDate, dateStyle: .none, timeStyle: .short)
             nextTriggerLabel.title = "Next: \(next.eventTitle) \(time)"
-            nextTriggerLabel.image = nil
-            nextTriggerLabel.action = nil
-            nextTriggerLabel.target = nil
-        } else if state.refreshing {
-            nextTriggerLabel.title = "Refreshing…"
-            nextTriggerLabel.image = nil
-            nextTriggerLabel.action = nil
-            nextTriggerLabel.target = nil
         } else {
             nextTriggerLabel.title = "No upcoming reminders"
-            nextTriggerLabel.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")
-            nextTriggerLabel.action = #selector(handleRefresh)
-            nextTriggerLabel.target = self
         }
-        nextTriggerLabel.isEnabled = state.nextTrigger == nil && !state.refreshing
+
+        // Always enabled so a stale Poll can be corrected manually even when a Trigger is
+        // already upcoming (RF-12); only disabled while its own Poll is actually in flight.
+        refreshItem.title = state.refreshing ? "Refreshing…" : "Refresh now"
+        refreshItem.isEnabled = !state.refreshing
 
         calendars = state.calendars
         rebuildCalendarsSubmenu()
@@ -142,7 +136,14 @@ final class StatusMenuController {
 
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
+        nextTriggerLabel.isEnabled = false
         menu.addItem(nextTriggerLabel)
+
+        refreshItem.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")
+        refreshItem.action = #selector(handleRefresh)
+        refreshItem.target = self
+        menu.addItem(refreshItem)
+
         menu.addItem(.separator())
 
         toggleItem.action = #selector(handleToggleEnabled)

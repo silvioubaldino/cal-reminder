@@ -9,15 +9,25 @@ final class AirplaneBannerView: NSView {
     private let bannerLayer = CALayer()
     private let bannerTextLayer = CATextLayer()
 
-    private static let bannerSize = CGSize(width: 300, height: 44)
+    private static let bannerWidth: CGFloat = 300
+    private static let bannerMinHeight: CGFloat = 44
     private static let airplaneSize = CGSize(width: 60, height: 60)
     private static let bannerFontSize: CGFloat = 14
+    private static let bannerFont = NSFont.systemFont(ofSize: bannerFontSize)
+    private static let bannerHorizontalPadding: CGFloat = 8
+    /// A CATextLayer draws its (single) line from the top of its bounds, so this is also
+    /// used to center a single line vertically within the taller Banner.
+    private static let singleLineHeight = bannerFontSize * 1.3
+    /// Caps how tall the Banner can grow for a very long title (RF-05): beyond this, the
+    /// text truncates with an ellipsis instead of pushing the Banner further down the screen.
+    private static let bannerMaxLines = 3
     /// Gap between the Banner's leading edge and the Airplane's tail, spanned by the rope.
     private static let ropeLength: CGFloat = 26
 
     /// Total width of the Airplane + rope + Banner group, used by `FlightSpeed` to
-    /// compute a screen-size-independent flight duration.
-    static let containerWidth = airplaneSize.width + ropeLength + bannerSize.width
+    /// compute a screen-size-independent flight duration. The Banner's width is fixed —
+    /// only its height grows to fit wrapped text — so this stays constant.
+    static let containerWidth = airplaneSize.width + ropeLength + bannerWidth
     /// How long a skipped flight takes to cross the remaining distance.
     private static let skipDuration: CFTimeInterval = 1.5
 
@@ -44,11 +54,6 @@ final class AirplaneBannerView: NSView {
     private func setUpLayers() {
         let scale = NSScreen.main?.backingScaleFactor ?? 2
 
-        let containerSize = CGSize(
-            width: Self.containerWidth,
-            height: max(Self.airplaneSize.height, Self.bannerSize.height)
-        )
-        containerLayer.bounds = CGRect(origin: .zero, size: containerSize)
         containerLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
 
         // Flight moves left-to-right, so the Airplane leads (trailing edge = right)
@@ -56,51 +61,25 @@ final class AirplaneBannerView: NSView {
         if let image = NSImage(named: "airplane") {
             airplaneLayer.contents = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         }
-        airplaneLayer.frame = CGRect(
-            x: Self.bannerSize.width + Self.ropeLength,
-            y: (containerSize.height - Self.airplaneSize.height) / 2,
-            width: Self.airplaneSize.width,
-            height: Self.airplaneSize.height
-        )
         airplaneLayer.contentsScale = scale
 
         bannerLayer.backgroundColor = NSColor.systemPink.cgColor
         bannerLayer.cornerRadius = 8
-        bannerLayer.frame = CGRect(
-            x: 0,
-            y: (containerSize.height - Self.bannerSize.height) / 2,
-            width: Self.bannerSize.width,
-            height: Self.bannerSize.height
-        )
 
-        // A CATextLayer draws its (single) line from the top of its bounds, so to center
-        // it vertically in the taller Banner we size it to the line's own height and
-        // center that smaller rect within the Banner, instead of using the full height.
-        let textHeight = Self.bannerFontSize * 1.3
+        bannerTextLayer.font = Self.bannerFont
         bannerTextLayer.fontSize = Self.bannerFontSize
         bannerTextLayer.alignmentMode = .center
         bannerTextLayer.foregroundColor = NSColor.white.cgColor
-        bannerTextLayer.frame = CGRect(
-            x: 8,
-            y: (Self.bannerSize.height - textHeight) / 2,
-            width: Self.bannerSize.width - 16,
-            height: textHeight
-        )
+        // Wrap long titles instead of overflowing the Banner's fixed width (RF-05); a
+        // capped max height (`layoutContainer`) still needs a truncation mode for titles
+        // beyond `bannerMaxLines`.
+        bannerTextLayer.isWrapped = true
+        bannerTextLayer.truncationMode = .end
         bannerTextLayer.contentsScale = scale
         bannerLayer.addSublayer(bannerTextLayer)
 
         // Rope: a slightly sagging line tying the Banner's leading edge to the
         // Airplane's tail, so the two read as one towed unit without needing artwork.
-        let ropeY = containerSize.height / 2
-        let ropeStart = CGPoint(x: bannerLayer.frame.maxX, y: ropeY)
-        let ropeEnd = CGPoint(x: airplaneLayer.frame.minX, y: ropeY)
-        let ropePath = CGMutablePath()
-        ropePath.move(to: ropeStart)
-        ropePath.addQuadCurve(
-            to: ropeEnd,
-            control: CGPoint(x: (ropeStart.x + ropeEnd.x) / 2, y: ropeY - 6)
-        )
-        ropeLayer.path = ropePath
         ropeLayer.strokeColor = NSColor.textColor.withAlphaComponent(0.6).cgColor
         ropeLayer.fillColor = nil
         ropeLayer.lineWidth = 1.5
@@ -111,6 +90,67 @@ final class AirplaneBannerView: NSView {
         containerLayer.addSublayer(ropeLayer)
         containerLayer.addSublayer(airplaneLayer)
         layer?.addSublayer(containerLayer)
+
+        layoutContainer(bannerHeight: Self.bannerMinHeight)
+    }
+
+    /// Recomputes every layer's frame for the given Banner height, keeping the Airplane
+    /// and rope centered against a Banner that may have grown to fit wrapped text (RF-05).
+    private func layoutContainer(bannerHeight: CGFloat) {
+        let containerSize = CGSize(
+            width: Self.containerWidth,
+            height: max(Self.airplaneSize.height, bannerHeight)
+        )
+        containerLayer.bounds = CGRect(origin: .zero, size: containerSize)
+
+        airplaneLayer.frame = CGRect(
+            x: Self.bannerWidth + Self.ropeLength,
+            y: (containerSize.height - Self.airplaneSize.height) / 2,
+            width: Self.airplaneSize.width,
+            height: Self.airplaneSize.height
+        )
+
+        bannerLayer.frame = CGRect(
+            x: 0,
+            y: (containerSize.height - bannerHeight) / 2,
+            width: Self.bannerWidth,
+            height: bannerHeight
+        )
+
+        let textHeight = min(bannerHeight, Self.singleLineHeight * CGFloat(Self.bannerMaxLines))
+        bannerTextLayer.frame = CGRect(
+            x: Self.bannerHorizontalPadding,
+            y: (bannerHeight - textHeight) / 2,
+            width: Self.bannerWidth - Self.bannerHorizontalPadding * 2,
+            height: textHeight
+        )
+
+        let ropeY = containerSize.height / 2
+        let ropeStart = CGPoint(x: bannerLayer.frame.maxX, y: ropeY)
+        let ropeEnd = CGPoint(x: airplaneLayer.frame.minX, y: ropeY)
+        let ropePath = CGMutablePath()
+        ropePath.move(to: ropeStart)
+        ropePath.addQuadCurve(
+            to: ropeEnd,
+            control: CGPoint(x: (ropeStart.x + ropeEnd.x) / 2, y: ropeY - 6)
+        )
+        ropeLayer.path = ropePath
+    }
+
+    /// Measures how tall the Banner needs to be for `text` to wrap within its fixed width,
+    /// capped at `bannerMaxLines` (beyond that, `truncationMode` takes over).
+    private func bannerHeight(forWrapping text: String) -> CGFloat {
+        let maxTextWidth = Self.bannerWidth - Self.bannerHorizontalPadding * 2
+        let measured = (text as NSString).boundingRect(
+            with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin],
+            attributes: [.font: Self.bannerFont]
+        )
+        let maxTextHeight = Self.singleLineHeight * CGFloat(Self.bannerMaxLines)
+        let textHeight = min(ceil(measured.height), maxTextHeight)
+        // Same padding a single-line title gets today, so the common case keeps its size.
+        let verticalPadding = Self.bannerMinHeight - Self.singleLineHeight
+        return max(Self.bannerMinHeight, textHeight + verticalPadding)
     }
 
     /// Sets the Banner's background color (RF-07, banner color is configurable).
@@ -123,6 +163,7 @@ final class AirplaneBannerView: NSView {
     /// `speed` determines how fast the Airplane crosses this view, independent of the
     /// screen's width (RF-07).
     func animate(text: String, speed: FlightSpeed) async {
+        layoutContainer(bannerHeight: bannerHeight(forWrapping: text))
         bannerTextLayer.string = text
         let duration = speed.flightDuration(forScreenWidth: bounds.width)
 

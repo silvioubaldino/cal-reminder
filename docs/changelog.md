@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-012: the menu bar's "Refresh now" is now always clickable, not only when there's no upcoming Reminder, so a stale sync can always be corrected manually.
+- Fixed the Banner's text overflowing and hiding part of a long Event title; it now wraps onto extra lines instead (SPEC-001).
 - Implemented SPEC-011: added a "Click anywhere to skip" menu toggle to opt out of skipping a Reminder animation, persisted across restarts.
 - Implemented SPEC-010: the menu now only shows "Connected" when the session is actually verified (not just when a token is stored), a revoked Google session prompts reconnecting instead of silently staying stuck, the empty "No upcoming reminders" row can trigger a manual Poll, background Poll runs every 5 minutes instead of 2, and the menu offers a "Sign out of Google" action.
 - Fixed the menu bar's "Next" Reminder display going stale to "No upcoming reminders" after an incremental Poll reported no changed Events, even though a Trigger was still correctly armed.

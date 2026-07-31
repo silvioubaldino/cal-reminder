@@ -2,7 +2,7 @@
 id: SPEC-001
 type: spec
 status: review
-updated: 2026-07-11
+updated: 2026-07-31
 parents: [AYD-001]
 related: [GLO]
 ---
@@ -41,6 +41,12 @@ Scenario: Test action
   Given the menu bar is open
   When the user clicks "Test animation"
   Then a sample airplane + banner animation plays
+
+Scenario: Long title wraps instead of overflowing
+  Given a Trigger whose banner text doesn't fit the Banner's width on one line
+  When it is enqueued
+  Then the text wraps onto additional lines within the Banner (up to 3), growing the
+    Banner's height instead of clipping or spilling past its edges
 ```
 
 ## How (approach)
@@ -51,6 +57,10 @@ Core Animation layer: an Airplane view + Banner view whose position animates lef
 across the screen width. A serial in-memory queue drains one Trigger at a time; each
 animation resolves a completion that dequeues the next. Banner text via a pure formatter
 `bannerText(title:start:minutesBefore:) -> String`.
+
+The Banner's width is fixed; its height is measured from the text before each flight and
+wraps up to 3 lines (`CATextLayer.isWrapped`), truncating with an ellipsis beyond that —
+the Airplane and rope stay centered against the taller Banner.
 
 ## Steps
 1. `OverlayPanel: NSPanel` subclass — window flags, `canBecomeKey=false`, full-screen frame of `NSScreen.main`.
@@ -77,3 +87,4 @@ animation resolves a completion that dequeues the next. Banner text via a pure f
 - [x] Banner text matches RF-05 format (`BannerTextTests`)
 - [x] FIFO queue: no two animations overlap (`OverlayQueueTests`)
 - [ ] "Test animation" menu item plays a sample (manual — app launches and the menu action is wired; visual confirmation pending)
+- [ ] A title too long for one line wraps within the Banner instead of overflowing (manual)

@@ -3,7 +3,7 @@ id: REQ-01
 type: requirements
 title: Requirements and glossary
 status: approved
-updated: 2026-07-16
+updated: 2026-07-31
 parents: []
 children: [AYD-001, AYD-003, AYD-004, AYD-005]
 related: [GLO]
@@ -29,6 +29,7 @@ related: [GLO]
 | RF-08 | Choose the Banner's color | Must | The menu bar offers a set of Banner color presets; the selection persists across restarts and applies from the next animation on |
 | RF-09 | Skip a playing Reminder animation | Should | While the airplane + banner Overlay is flying, a click anywhere on the screen accelerates it to cover the remaining distance in ~1.5s instead of blocking the click through |
 | RF-10 | Choose which Calendars to be alerted on | Should | The menu bar lists every Calendar in the connected account with a multi-select control; only selected Calendars generate Triggers; the selection persists across restarts and applies from the next Poll on. Default when the user has not chosen: all Calendars |
+| RF-12 | Manually force a Poll from the menu bar | Should | The menu bar offers a "Refresh now" control, always clickable regardless of whether a Trigger is currently upcoming, so a stale sync can be corrected without waiting for the next background Poll; while the triggered Poll is in flight the control reads "Refreshing…" and is disabled |
 
 ## Non-functional (RNF)
 | ID | Category | Requirement | Target |
