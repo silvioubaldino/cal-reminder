@@ -30,7 +30,9 @@ Scenario: Fly the airplane over all windows
 Scenario: Banner text
   Given a Trigger with title "Standup", start 14:00, 5 minutes before
   When it is enqueued
-  Then the banner reads "Standup at 14:00 (in 5 min)"
+  Then the banner reads "Standup" bold on the first line and "at 14:00 (in 5 min)" italic
+    on the second
+  And both lines are centered within the Banner
 
 Scenario: One animation at a time (FIFO)
   Given an animation is currently playing
@@ -42,11 +44,11 @@ Scenario: Test action
   When the user clicks "Test animation"
   Then a sample airplane + banner animation plays
 
-Scenario: Long title wraps instead of overflowing
-  Given a Trigger whose banner text doesn't fit the Banner's width on one line
+Scenario: Long title widens the Banner instead of overflowing
+  Given a Trigger whose title doesn't fit the Banner's base width
   When it is enqueued
-  Then the text wraps onto additional lines within the Banner (up to 3), growing the
-    Banner's height instead of clipping or spilling past its edges
+  Then the Banner grows wider (up to its maximum) to fit the title instead of clipping it
+  And beyond that maximum the text wraps (up to 3 lines) and only then truncates
 ```
 
 ## How (approach)
@@ -58,9 +60,15 @@ across the screen width. A serial in-memory queue drains one Trigger at a time; 
 animation resolves a completion that dequeues the next. Banner text via a pure formatter
 `bannerText(title:start:minutesBefore:) -> String`.
 
-The Banner's width is fixed; its height is measured from the text before each flight and
-wraps up to 3 lines (`CATextLayer.isWrapped`), truncating with an ellipsis beyond that —
-the Airplane and rope stay centered against the taller Banner.
+The Banner text is formatted on two lines — the title, then `at HH:MM (in X min)` — so the
+split is deliberate rather than left to automatic wrapping. `AirplaneBannerView` renders it as
+an `NSAttributedString` (title bold, time italic, both centered) instead of a plain
+`CATextLayer` string. Before each flight the Banner is measured from that styled text: it keeps
+a fixed base width and grows wider on demand (up to a maximum) for a long title; only past that
+maximum does the text wrap (`CATextLayer.isWrapped`, up to 3 lines) and then truncate with an
+ellipsis. The text block is centered vertically in the Banner, and the Airplane and rope stay
+centered against it. The real group width is passed to `FlightSpeed`, so a widened Banner still
+flies at the same points per second.
 
 ## Steps
 1. `OverlayPanel: NSPanel` subclass — window flags, `canBecomeKey=false`, full-screen frame of `NSScreen.main`.
@@ -87,4 +95,4 @@ the Airplane and rope stay centered against the taller Banner.
 - [x] Banner text matches RF-05 format (`BannerTextTests`)
 - [x] FIFO queue: no two animations overlap (`OverlayQueueTests`)
 - [ ] "Test animation" menu item plays a sample (manual — app launches and the menu action is wired; visual confirmation pending)
-- [ ] A title too long for one line wraps within the Banner instead of overflowing (manual)
+- [ ] A long title widens the Banner instead of overflowing; both lines stay centered (manual)

@@ -23,7 +23,7 @@ related: [GLO]
 | RF-02 | Read timed Events from each selected Calendar | Must | Events with a start time are read from every selected Calendar (RF-10); all-day Events are ignored (RN-01) |
 | RF-03 | Resolve each Event's effective popup Reminders | Must | For each Event, the app derives its Reminders from `overrides` or the calendar defaults, keeping only `popup` (RN-04) |
 | RF-04 | Fly the airplane + banner Overlay at each Reminder time | Must | At `Event start − Reminder minutes`, an airplane pulling a banner slides across the screen over all windows (RN-02) |
-| RF-05 | The banner shows the Event and time | Must | The banner text reads `<Title> at HH:MM (in X min)` |
+| RF-05 | The banner shows the Event and time | Must | The banner text reads on two centered lines — `<Title>` in bold, then `at HH:MM (in X min)` in italic; the Banner keeps a fixed width, widening on demand for a long title rather than hiding it |
 | RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including the connected account's email), toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, choose the Banner's color, choose which Calendars to be alerted on (RF-10), and quit |
 | RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts, applies from the next animation on, and the Airplane crosses any screen size at the same visual speed |
 | RF-08 | Choose the Banner's color | Must | The menu bar offers a set of Banner color presets; the selection persists across restarts and applies from the next animation on |

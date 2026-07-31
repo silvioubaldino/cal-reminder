@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- The Banner now shows the Event's title (bold) and its time (italic) on two centered lines, and widens on demand for a long title instead of hiding part of it (RF-05).
 - Implemented SPEC-012: the menu bar's "Refresh now" is now always clickable, not only when there's no upcoming Reminder, so a stale sync can always be corrected manually.
 - Fixed the Banner's text overflowing and hiding part of a long Event title; it now wraps onto extra lines instead (SPEC-001).
 - Implemented SPEC-011: added a "Click anywhere to skip" menu toggle to opt out of skipping a Reminder animation, persisted across restarts.

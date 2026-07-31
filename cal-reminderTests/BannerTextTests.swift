@@ -20,7 +20,7 @@ final class BannerTextTests: XCTestCase {
         let text = BannerText.bannerText(title: "Standup", start: start, minutesBefore: 5)
 
         // Assert
-        XCTAssertEqual(text, "Standup at 14:00 (in 5 min)")
+        XCTAssertEqual(text, "Standup\nat 14:00 (in 5 min)")
     }
 
     func test_padsSingleDigitHourAndMinute() {
@@ -31,7 +31,7 @@ final class BannerTextTests: XCTestCase {
         let text = BannerText.bannerText(title: "1:1", start: start, minutesBefore: 10)
 
         // Assert
-        XCTAssertEqual(text, "1:1 at 09:05 (in 10 min)")
+        XCTAssertEqual(text, "1:1\nat 09:05 (in 10 min)")
     }
 
     func test_zeroMinutesBefore() {
@@ -42,6 +42,6 @@ final class BannerTextTests: XCTestCase {
         let text = BannerText.bannerText(title: "Kickoff", start: start, minutesBefore: 0)
 
         // Assert
-        XCTAssertEqual(text, "Kickoff at 08:30 (in 0 min)")
+        XCTAssertEqual(text, "Kickoff\nat 08:30 (in 0 min)")
     }
 }

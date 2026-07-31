@@ -35,9 +35,14 @@ enum FlightSpeed: String, CaseIterable {
     }
 
     /// Time the Airplane takes to cross a screen of `screenWidth` points at this
-    /// preset's speed.
-    func flightDuration(forScreenWidth screenWidth: CGFloat) -> CFTimeInterval {
-        Double((screenWidth + AirplaneBannerView.containerWidth) / pointsPerSecond)
+    /// preset's speed. `containerWidth` is the actual width of the Airplane + rope +
+    /// Banner group, which grows when a long title widens the Banner — passing it keeps
+    /// the flight at the same points per second instead of looking faster (RF-07).
+    func flightDuration(
+        forScreenWidth screenWidth: CGFloat,
+        containerWidth: CGFloat = AirplaneBannerView.containerWidth
+    ) -> CFTimeInterval {
+        Double((screenWidth + containerWidth) / pointsPerSecond)
     }
 
     private static func cgFloat(_ value: CFTimeInterval) -> CGFloat { CGFloat(value) }
