@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-07-16
+updated: 2026-08-14
 ---
 
 # Changelog
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- "Refresh now" now does a full resync: it refetches the whole upcoming window and rebuilds the reminder list, so entries for events that were deleted or rescheduled disappear.
 - The Banner now shows the Event's title (bold) and its time (italic) on two centered lines, and widens on demand for a long title instead of hiding part of it (RF-05).
 - Implemented SPEC-012: the menu bar's "Refresh now" is now always clickable, not only when there's no upcoming Reminder, so a stale sync can always be corrected manually.
 - Fixed the Banner's text overflowing and hiding part of a long Event title; it now wraps onto extra lines instead (SPEC-001).

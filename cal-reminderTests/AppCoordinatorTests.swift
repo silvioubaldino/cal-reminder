@@ -38,9 +38,12 @@ private final class FakeCalendarServicing: CalendarServicing {
     var calendars: [CalendarInfo] = []
     var error: Error?
     private(set) var pollCallCount = 0
+    /// The `fullResync` flag received per call, in order (SPEC-013).
+    private(set) var receivedFullResyncFlags: [Bool] = []
 
-    func poll() async throws -> [Trigger] {
+    func poll(fullResync: Bool) async throws -> [Trigger] {
         pollCallCount += 1
+        receivedFullResyncFlags.append(fullResync)
         if let error { throw error }
         return triggers
     }
@@ -303,7 +306,7 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     func test_refreshNowTriggersPollAndTogglesRefreshingFlag() async throws {
-        // Arrange (RF-12: manual Poll from the empty state)
+        // Arrange (RF-12: manual Poll)
         let calendar = FakeCalendarServicing()
         let coordinator = makeCoordinator(calendar: calendar)
 
@@ -315,6 +318,60 @@ final class AppCoordinatorTests: XCTestCase {
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertFalse(coordinator.state.refreshing)
         XCTAssertEqual(calendar.pollCallCount, 1)
+    }
+
+    func test_refreshNowRequestsAFullResyncWhileOtherPollsStayIncremental() async throws {
+        // Arrange (SPEC-013: only the manual refresh discards the syncTokens)
+        let calendar = FakeCalendarServicing()
+        let coordinator = makeCoordinator(calendar: calendar)
+
+        // Act
+        await coordinator.poll()
+        await coordinator.handleWake()
+        coordinator.refreshNow()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(calendar.receivedFullResyncFlags, [false, false, true])
+    }
+
+    func test_refreshNowRebuildsTheArmedSetDroppingVanishedTriggers() async throws {
+        // Arrange: a Trigger is armed, then its Event disappears from the Poll window
+        // (deleted or rescheduled) — a full resync must not report it anymore.
+        let calendar = FakeCalendarServicing()
+        calendar.triggers = [trigger(id: "evt1#5", minutesFromNow: 5)]
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(calendar: calendar, scheduler: scheduler)
+        await coordinator.poll()
+        XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
+
+        // Act
+        calendar.triggers = []
+        coordinator.refreshNow()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertNil(coordinator.state.nextTrigger)
+    }
+
+    func test_failedRefreshNowKeepsTheArmedTriggers() async throws {
+        // Arrange (RNF-04: a network failure mid-refresh must not disarm everything)
+        let calendar = FakeCalendarServicing()
+        calendar.triggers = [trigger(id: "evt1#5", minutesFromNow: 5)]
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(calendar: calendar, scheduler: scheduler)
+        await coordinator.poll()
+
+        // Act
+        calendar.error = URLError(.notConnectedToInternet)
+        coordinator.refreshNow()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertEqual(scheduler.cancelAllCallCount, 0)
+        XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
+        XCTAssertEqual(coordinator.state.connectionStatus, .connected(email: "user@example.com"))
     }
 
     func test_logoutCancelsTriggersDisconnectsAndClearsSession() async throws {
