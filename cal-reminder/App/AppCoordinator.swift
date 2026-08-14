@@ -74,12 +74,14 @@ final class AppCoordinator {
         }
     }
 
-    /// Manual Poll (RF-12) from the empty-state menu row: sets `refreshing` for the duration.
+    /// Manual Poll (RF-12) from the "Refresh now" menu item: sets `refreshing` for the
+    /// duration and runs a **full resync** (SPEC-013), so a stale state is rebuilt rather
+    /// than merged into — an incremental delta can't drop a Trigger whose Event is gone.
     func refreshNow() {
         guard !state.refreshing else { return }
         state.refreshing = true
         notify()
-        Task { await poll() }
+        Task { await poll(fullResync: true) }
     }
 
     func testAnimation() {
@@ -97,9 +99,16 @@ final class AppCoordinator {
     /// Not `private`: exercised directly by `AppCoordinatorTests` (via `@testable import`)
     /// to assert `AppState` transitions deterministically, without going through the
     /// fire-and-forget `PollLoop`/`Task` wrappers real callers use.
-    func poll() async {
+    func poll(fullResync: Bool = false) async {
         do {
-            let triggers = try await calendar.poll()
+            let triggers = try await calendar.poll(fullResync: fullResync)
+            // A full resync (SPEC-013) returns the complete window, so it *replaces* the
+            // accumulated armed set instead of merging into it — that's what drops Triggers
+            // whose Event was deleted or moved out of the window. Cancelling only after the
+            // fetch succeeded keeps a failed manual refresh from disarming everything (RNF-04).
+            if fullResync {
+                await scheduler.cancelAll()
+            }
             await scheduler.schedule(triggers)
             state.connectionStatus = .connected(email: currentEmail)
             // Not `triggers.min(...)`: incremental Polls (RNF-06) only report Events that

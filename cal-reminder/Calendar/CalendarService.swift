@@ -3,10 +3,22 @@ import Foundation
 protocol CalendarServicing {
     /// Fetches upcoming Events for the next window, across every selected Calendar, and
     /// returns their resolved `[Trigger]` (RF-02/RF-03; RN-01/RN-02/RN-03).
-    func poll() async throws -> [Trigger]
+    ///
+    /// `fullResync` discards the stored `syncToken`s first, so the fetch returns the whole
+    /// window instead of the delta since the last Poll — what the manual "Refresh now"
+    /// (RF-12) needs to rebuild a stale state (SPEC-013). The background Poll leaves it
+    /// `false` and stays incremental (RNF-06).
+    func poll(fullResync: Bool) async throws -> [Trigger]
 
     /// Every Calendar in the connected account, for the "Calendars" menu (RF-10).
     func availableCalendars() async throws -> [CalendarInfo]
+}
+
+extension CalendarServicing {
+    /// The incremental Poll — the default everywhere except the manual refresh.
+    func poll() async throws -> [Trigger] {
+        try await poll(fullResync: false)
+    }
 }
 
 final class CalendarService: CalendarServicing {
@@ -35,7 +47,13 @@ final class CalendarService: CalendarServicing {
         }
     }
 
-    func poll() async throws -> [Trigger] {
+    func poll(fullResync: Bool) async throws -> [Trigger] {
+        if fullResync {
+            // Drop the sync state so every Calendar goes back through the timeMin/timeMax
+            // branch (SPEC-013). `cachedDefaultReminders` is kept: it isn't sync state, and
+            // the full fetch refreshes it inline anyway (RN-04).
+            syncTokens.removeAll()
+        }
         let calendars = try await api.listCalendars()
         let allIds = Set(calendars.map(\.id))
         let selectedIds = selectionStore.selectedCalendarIds?.intersection(allIds) ?? allIds

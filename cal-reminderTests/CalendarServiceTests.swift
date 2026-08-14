@@ -163,6 +163,39 @@ final class CalendarServiceTests: XCTestCase {
         XCTAssertEqual(api.receivedSyncTokens, [nil, "token-abc"])
     }
 
+    func test_fullResyncPollDropsTheStoredSyncToken() async throws {
+        // Arrange (SPEC-013: the manual refresh refetches the whole window)
+        let api = StubGoogleCalendarAPI()
+        api.nextSyncTokens["primary"] = "token-abc"
+        let service = CalendarService(api: api, selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
+
+        // Act
+        _ = try await service.poll()
+        _ = try await service.poll(fullResync: true)
+        _ = try await service.poll()
+
+        // Assert: full call, then a full call again despite the stored token, then
+        // incremental from the token that full call returned.
+        XCTAssertEqual(api.receivedSyncTokens, [nil, nil, "token-abc"])
+    }
+
+    func test_fullResyncKeepsTheCachedDefaultReminders() async throws {
+        // Arrange: the cached defaults aren't sync state — dropping them would break
+        // resolution (RN-04) if a later response omits them.
+        let api = StubGoogleCalendarAPI()
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        let service = CalendarService(api: api, selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
+        _ = try await service.poll()
+
+        // Act
+        api.defaultReminders.updateValue(nil, forKey: "primary")
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(600))]
+        let triggers = try await service.poll(fullResync: true)
+
+        // Assert
+        XCTAssertEqual(triggers.first?.id, "primary#evt1#10")
+    }
+
     func test_remembersDefaultRemindersWhenResponseOmitsThem() async throws {
         // Arrange
         let api = StubGoogleCalendarAPI()
