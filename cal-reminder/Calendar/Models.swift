@@ -47,6 +47,9 @@ struct GoogleCalendarListEntry: Decodable {
     /// One of "owner" | "writer" | "reader" | "freeBusyReader"; only the first three can
     /// read Event details.
     let accessRole: String
+    /// The Calendar Color (GLO), as hex — `"#0088aa"`. Optional: never assume the API
+    /// sends it; a Calendar without one falls back to the Banner color preset (RF-13).
+    let backgroundColor: String?
 }
 
 struct GoogleCalendarListResponse: Decodable {

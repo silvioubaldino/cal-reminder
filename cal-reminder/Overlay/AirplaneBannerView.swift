@@ -40,6 +40,9 @@ final class AirplaneBannerView: NSView {
     /// How long a skipped flight takes to cross the remaining distance.
     private static let skipDuration: CFTimeInterval = 1.5
 
+    /// White unless the animator overrides it for contrast against a Calendar Color (RF-13).
+    private var bannerTextColor: NSColor = .white
+
     private var flightContinuation: CheckedContinuation<Void, Never>?
     private var flightEndX: CGFloat = 0
     private var flightY: CGFloat = 0
@@ -168,7 +171,7 @@ final class AirplaneBannerView: NSView {
 
         let result = NSMutableAttributedString(string: text)
         result.addAttributes(
-            [.paragraphStyle: paragraphStyle, .foregroundColor: NSColor.white],
+            [.paragraphStyle: paragraphStyle, .foregroundColor: bannerTextColor],
             range: NSRange(location: 0, length: result.length)
         )
 
@@ -217,6 +220,13 @@ final class AirplaneBannerView: NSView {
     /// Sets the Banner's background color (RF-07, banner color is configurable).
     func setBannerColor(_ color: NSColor) {
         bannerLayer.backgroundColor = color.cgColor
+    }
+
+    /// Sets the Banner text's color, so it stays readable on a Banner painted with an
+    /// arbitrary Calendar Color (RF-13). Must be set before `animate(text:speed:)`, which
+    /// is what builds the styled text.
+    func setBannerTextColor(_ color: NSColor) {
+        bannerTextColor = color
     }
 
     /// Slides the Airplane + Banner left-to-right across the view, updating the banner

@@ -3,7 +3,7 @@ import XCTest
 
 private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     var calendars: [GoogleCalendarListEntry] = [
-        GoogleCalendarListEntry(id: "primary", summary: "Primary", primary: true, accessRole: "owner")
+        GoogleCalendarListEntry(id: "primary", summary: "Primary", primary: true, accessRole: "owner", backgroundColor: nil)
     ]
     /// Per-calendarId fixtures, keyed the same way the real API is keyed by `calendarId`.
     var events: [String: [GoogleEvent]] = [:]
@@ -214,12 +214,35 @@ final class CalendarServiceTests: XCTestCase {
         XCTAssertEqual(triggers.first?.id, "primary#evt1#10")
     }
 
+    func test_stampsEachCalendarsColorOnItsTriggers() async throws {
+        // Arrange (RF-13: the Calendar Color travels on the Trigger to fire time)
+        let api = StubGoogleCalendarAPI()
+        api.calendars = [
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: "#0b8043"),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
+        ]
+        api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
+        api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
+        api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        let service = CalendarService(api: api, selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
+
+        // Act
+        let triggers = try await service.poll()
+
+        // Assert
+        let triggerA = try XCTUnwrap(triggers.first(where: { $0.id == "A#evt-a#10" }))
+        let triggerB = try XCTUnwrap(triggers.first(where: { $0.id == "B#evt-b#10" }))
+        XCTAssertEqual(triggerA.calendarColorHex, "#0b8043")
+        XCTAssertNil(triggerB.calendarColorHex)
+    }
+
     func test_defaultSelectionPollsEveryCalendar() async throws {
         // Arrange (RF-10: never-chosen selection = all Calendars)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
-            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner"),
-            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader")
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
         api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
@@ -239,8 +262,8 @@ final class CalendarServiceTests: XCTestCase {
         // Arrange
         let api = StubGoogleCalendarAPI()
         api.calendars = [
-            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner"),
-            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader")
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
         api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
@@ -260,8 +283,8 @@ final class CalendarServiceTests: XCTestCase {
         // Arrange (same eventId in two Calendars must not collide, RN-03)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
-            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner"),
-            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader")
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         let sharedEventId = "shared-evt"
         api.events["A"] = [timedEvent(id: sharedEventId, title: "Shared", startDate: fixedNow.addingTimeInterval(600))]
@@ -282,8 +305,8 @@ final class CalendarServiceTests: XCTestCase {
         // Arrange
         let api = StubGoogleCalendarAPI()
         api.calendars = [
-            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner"),
-            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader")
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         api.nextSyncTokens["A"] = "token-a"
         let service = CalendarService(api: api, selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
@@ -302,7 +325,7 @@ final class CalendarServiceTests: XCTestCase {
     func test_expiredSyncTokenDropsAndRetriesOnce() async throws {
         // Arrange
         let api = StubGoogleCalendarAPI()
-        api.calendars = [GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner")]
+        api.calendars = [GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil)]
         api.expireTokenOnce = ["A"]
         api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
@@ -322,8 +345,8 @@ final class CalendarServiceTests: XCTestCase {
         // Triggers from every other selected Calendar from coming back.
         let api = StubGoogleCalendarAPI()
         api.calendars = [
-            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner"),
-            GoogleCalendarListEntry(id: "broken", summary: "Broken", primary: false, accessRole: "reader")
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "broken", summary: "Broken", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         api.alwaysFail = ["broken"]
         api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
@@ -359,8 +382,8 @@ final class CalendarServiceTests: XCTestCase {
         // Arrange (accessRole filtering itself is GoogleCalendarAPI's job, covered in GoogleCalendarAPITests)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
-            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner"),
-            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader")
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         let service = CalendarService(api: api, selectionStore: StubCalendarSelectionStore())
 
