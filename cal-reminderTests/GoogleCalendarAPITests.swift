@@ -45,6 +45,26 @@ final class GoogleCalendarAPITests: XCTestCase {
         XCTAssertEqual(Set(calendars.map(\.id)), ["primary", "shared", "readonly"])
     }
 
+    func test_listCalendars_decodesTheCalendarColorWhenPresent() async throws {
+        // Arrange (RF-13; `backgroundColor` is optional — a response without it must decode)
+        let auth = FakeAuthManaging()
+        let json: [String: Any] = [
+            "items": [
+                ["id": "colored", "summary": "Colored", "accessRole": "owner", "backgroundColor": "#0b8043"],
+                ["id": "plain", "summary": "Plain", "accessRole": "owner"]
+            ]
+        ]
+        auth.response = (try! JSONSerialization.data(withJSONObject: json), httpResponse(status: 200))
+        let api = GoogleCalendarAPI(authManager: auth)
+
+        // Act
+        let calendars = try await api.listCalendars()
+
+        // Assert
+        XCTAssertEqual(calendars.first(where: { $0.id == "colored" })?.backgroundColor, "#0b8043")
+        XCTAssertNil(calendars.first(where: { $0.id == "plain" })?.backgroundColor)
+    }
+
     func test_listEvents_buildsPathForGivenCalendarId() async throws {
         // Arrange
         let auth = FakeAuthManaging()

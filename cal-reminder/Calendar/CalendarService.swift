@@ -59,10 +59,18 @@ final class CalendarService: CalendarServicing {
         let selectedIds = selectionStore.selectedCalendarIds?.intersection(allIds) ?? allIds
         print("[poll] \(calendars.count) available Calendars \(calendars.map(\.id)); stored selection=\(String(describing: selectionStore.selectedCalendarIds)); polling \(selectedIds)")
 
+        // The Calendar Color rides along on the list the Poll already fetches (RF-13) —
+        // no extra request; Calendars without one map to nil and fall back to the preset.
+        let colorsById = Dictionary(calendars.map { ($0.id, $0.backgroundColor) }, uniquingKeysWith: { _, last in last })
+
         var triggers: [Trigger] = []
         for calendarId in selectedIds {
             do {
-                triggers += try await pollTriggers(calendarId: calendarId, retryOnExpiredToken: true)
+                triggers += try await pollTriggers(
+                    calendarId: calendarId,
+                    calendarColorHex: colorsById[calendarId] ?? nil,
+                    retryOnExpiredToken: true
+                )
             } catch AuthError.refreshTokenRevoked {
                 // The session itself is dead, not just this Calendar — propagate so the
                 // AppCoordinator can drop to `.needsReauth` instead of silently skipping it.
@@ -74,7 +82,7 @@ final class CalendarService: CalendarServicing {
         return triggers
     }
 
-    private func pollTriggers(calendarId: String, retryOnExpiredToken: Bool) async throws -> [Trigger] {
+    private func pollTriggers(calendarId: String, calendarColorHex: String?, retryOnExpiredToken: Bool) async throws -> [Trigger] {
         let now = clock()
         let events: [GoogleEvent]
         let nextSyncToken: String?
@@ -89,7 +97,7 @@ final class CalendarService: CalendarServicing {
         } catch GoogleCalendarAPIError.unexpectedStatus(410) where retryOnExpiredToken {
             // Expired syncToken (RNF-06): drop it for this Calendar and retry once, full-window.
             syncTokens[calendarId] = nil
-            return try await pollTriggers(calendarId: calendarId, retryOnExpiredToken: false)
+            return try await pollTriggers(calendarId: calendarId, calendarColorHex: calendarColorHex, retryOnExpiredToken: false)
         }
 
         if let nextSyncToken {
@@ -116,7 +124,8 @@ final class CalendarService: CalendarServicing {
                     eventTitle: event.summary ?? "",
                     startDate: startDate,
                     fireDate: startDate.addingTimeInterval(-Double(minutes) * 60),
-                    minutesBefore: minutes
+                    minutesBefore: minutes,
+                    calendarColorHex: calendarColorHex
                 )
             }
         }

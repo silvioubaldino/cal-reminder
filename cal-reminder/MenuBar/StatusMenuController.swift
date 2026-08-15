@@ -52,10 +52,12 @@ final class StatusMenuController {
     private let onCalendarsChanged: () -> Void
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
+    private let matchCalendarColorStore: MatchCalendarColorStoring
     private let calendarSelectionStore: CalendarSelectionStoring
     private let skipOnClickStore: SkipOnClickStoring
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
+    private var matchCalendarColorItem: NSMenuItem!
     private var calendarsMenuItem: NSMenuItem!
     private var signOutItem: NSMenuItem!
     private var skipOnClickItem: NSMenuItem!
@@ -75,6 +77,7 @@ final class StatusMenuController {
         onCalendarsChanged: @escaping () -> Void = {},
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
         colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
+        matchCalendarColorStore: MatchCalendarColorStoring = UserDefaultsMatchCalendarColorStore(),
         calendarSelectionStore: CalendarSelectionStoring = UserDefaultsCalendarSelectionStore(),
         skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore()
     ) {
@@ -86,6 +89,7 @@ final class StatusMenuController {
         self.onCalendarsChanged = onCalendarsChanged
         self.speedStore = speedStore
         self.colorStore = colorStore
+        self.matchCalendarColorStore = matchCalendarColorStore
         self.calendarSelectionStore = calendarSelectionStore
         self.skipOnClickStore = skipOnClickStore
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -216,10 +220,22 @@ final class StatusMenuController {
         return speedMenuItem
     }
 
-    /// "Banner Color" submenu with the color presets (RF-07); the current preset is checked.
+    /// "Banner Color" submenu (RF-07): the "Match calendar color" toggle (RF-13) first, then
+    /// the color presets — which stay live as the fallback whenever no Calendar Color applies.
     private func bannerColorMenuItem() -> NSMenuItem {
         let submenu = NSMenu()
         let currentColor = colorStore.bannerColor
+
+        let matchItem = NSMenuItem(
+            title: "Match calendar color",
+            action: #selector(handleToggleMatchCalendarColor),
+            keyEquivalent: ""
+        )
+        matchItem.target = self
+        matchItem.state = matchCalendarColorStore.matchCalendarColor ? .on : .off
+        matchCalendarColorItem = matchItem
+        submenu.addItem(matchItem)
+        submenu.addItem(.separator())
 
         for color in BannerColor.allCases {
             let item = NSMenuItem(
@@ -315,6 +331,12 @@ final class StatusMenuController {
         for (color, item) in colorItems {
             item.state = color == selected ? .on : .off
         }
+    }
+
+    @objc private func handleToggleMatchCalendarColor() {
+        let newValue = !matchCalendarColorStore.matchCalendarColor
+        matchCalendarColorStore.matchCalendarColor = newValue
+        matchCalendarColorItem.state = newValue ? .on : .off
     }
 
     @objc private func handleToggleSkipOnClick() {

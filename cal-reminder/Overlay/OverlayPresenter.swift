@@ -3,7 +3,10 @@ import AppKit
 /// Plays the Airplane + Banner flight for a given Banner text. Abstracted so the FIFO
 /// queue in `OverlayPresenter` can be tested without driving real AppKit windows.
 protocol OverlayAnimating {
-    func animate(text: String) async
+    /// `calendarColorHex` is the Calendar Color of the Event's Calendar (RF-13), or nil
+    /// when there is none (colorless Calendar, or the test animation) — the animator then
+    /// falls back to the Banner color preset (RF-08).
+    func animate(text: String, calendarColorHex: String?) async
 }
 
 /// Default animator: shows an `OverlayPanel` over `NSScreen.main`, plays the flight on
@@ -12,26 +15,46 @@ protocol OverlayAnimating {
 final class DefaultOverlayAnimator: OverlayAnimating {
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
+    private let matchCalendarColorStore: MatchCalendarColorStoring
     private let skipOnClickStore: SkipOnClickStoring
 
     init(
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
         colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
+        matchCalendarColorStore: MatchCalendarColorStoring = UserDefaultsMatchCalendarColorStore(),
         skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore()
     ) {
         self.speedStore = speedStore
         self.colorStore = colorStore
+        self.matchCalendarColorStore = matchCalendarColorStore
         self.skipOnClickStore = skipOnClickStore
     }
 
-    func animate(text: String) async {
+    /// The Banner's background for this flight: the Event's Calendar Color when the user
+    /// asked for it and it parses, otherwise the chosen preset (RF-13 falls back to RF-08).
+    func bannerBackgroundColor(for calendarColorHex: String?) -> NSColor {
+        guard matchCalendarColorStore.matchCalendarColor,
+              let calendarColorHex,
+              let color = NSColor(bannerHex: calendarColorHex) else {
+            return colorStore.bannerColor.color
+        }
+        return color
+    }
+
+    func animate(text: String, calendarColorHex: String?) async {
         guard let screen = NSScreen.main else { return }
 
         let skipOnClick = skipOnClickStore.skipOnClick
 
         let panel = OverlayPanel(screen: screen)
         let view = AirplaneBannerView(frame: CGRect(origin: .zero, size: screen.frame.size))
-        view.setBannerColor(colorStore.bannerColor.color)
+        // Both colors are converted to the color space of the screen they'll be painted on,
+        // so a Calendar Color renders as the same tone the user sees in Google Calendar
+        // rather than as raw sRGB components on a wide-gamut display (TDR-004).
+        let background = bannerBackgroundColor(for: calendarColorHex)
+        let textColor = background.readableBannerTextColor
+        view.setBannerColor(background.matchingDisplayColorSpace(screen.colorSpace))
+        view.setBannerTextColor(textColor.matchingDisplayColorSpace(screen.colorSpace))
         if skipOnClick {
             view.onSkipRequested = { [weak view] in view?.skipToEnd() }
         }
@@ -78,7 +101,7 @@ actor OverlayPresenter {
                 start: trigger.startDate,
                 minutesBefore: trigger.minutesBefore
             )
-            await animator.animate(text: text)
+            await animator.animate(text: text, calendarColorHex: trigger.calendarColorHex)
         }
         drainTask = nil
     }

@@ -81,7 +81,7 @@ private final class FakeScheduler: Scheduling {
 }
 
 private actor NoOpAnimator: OverlayAnimating {
-    func animate(text: String) async {}
+    func animate(text: String, calendarColorHex: String?) async {}
 }
 
 @MainActor

@@ -5,7 +5,7 @@ title: Requirements and glossary
 status: approved
 updated: 2026-08-14
 parents: []
-children: [AYD-001, AYD-003, AYD-004, AYD-005]
+children: [AYD-001, AYD-003, AYD-004, AYD-005, AYD-006]
 related: [GLO]
 ---
 
@@ -24,12 +24,13 @@ related: [GLO]
 | RF-03 | Resolve each Event's effective popup Reminders | Must | For each Event, the app derives its Reminders from `overrides` or the calendar defaults, keeping only `popup` (RN-04) |
 | RF-04 | Fly the airplane + banner Overlay at each Reminder time | Must | At `Event start − Reminder minutes`, an airplane pulling a banner slides across the screen over all windows (RN-02) |
 | RF-05 | The banner shows the Event and time | Must | The banner text reads on two centered lines — `<Title>` in bold, then `at HH:MM (in X min)` in italic; the Banner keeps a fixed width, widening on demand for a long title rather than hiding it |
-| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including the connected account's email), toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, choose the Banner's color, choose which Calendars to be alerted on (RF-10), and quit |
+| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including the connected account's email), toggle the app on/off, test the animation, reconnect Google, choose the Airplane's Flight Speed, choose the Banner's color (preset or the Event's Calendar Color, RF-13), choose which Calendars to be alerted on (RF-10), and quit |
 | RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts, applies from the next animation on, and the Airplane crosses any screen size at the same visual speed |
 | RF-08 | Choose the Banner's color | Must | The menu bar offers a set of Banner color presets; the selection persists across restarts and applies from the next animation on |
 | RF-09 | Skip a playing Reminder animation | Should | While the airplane + banner Overlay is flying, a click anywhere on the screen accelerates it to cover the remaining distance in ~1.5s instead of blocking the click through |
 | RF-10 | Choose which Calendars to be alerted on | Should | The menu bar lists every Calendar in the connected account with a multi-select control; only selected Calendars generate Triggers; the selection persists across restarts and applies from the next Poll on. Default when the user has not chosen: all Calendars |
 | RF-12 | Manually force a Poll from the menu bar | Should | The menu bar offers a "Refresh now" control, always clickable regardless of whether a Trigger is currently upcoming, so a stale sync can be corrected without waiting for the next background Poll; while the triggered Poll is in flight the control reads "Refreshing…" and is disabled. Unlike the background Poll (RNF-06), the manual one is a **full resync**: it refetches the whole window and rebuilds the upcoming Triggers from it, so Triggers whose Event was deleted or rescheduled are dropped |
+| RF-13 | Paint the Banner with the Event's Calendar Color | Should | The menu bar offers a "Match calendar color" toggle inside the Banner color control; while it is on, each Banner is painted with the Calendar Color of the Calendar the Event came from, and the Banner text keeps a readable contrast against it; while it is off, every Banner uses the chosen color preset (RF-08). The preset is also the fallback when the Calendar has no color and for the test animation. The toggle persists across restarts and applies from the next animation on |
 
 ## Non-functional (RNF)
 | ID | Category | Requirement | Target |
@@ -92,4 +93,5 @@ ambiguity turns into a bug.
 | Airplane | _The little plane that flies across the Overlay pulling the banner._ | "plane sprite" |
 | Banner | _The strip pulled by the Airplane, showing the Event text._ | "faixa", "ribbon", "label" |
 | Poll | _The periodic fetch of upcoming Events from the Google Calendar API._ | "sync", "refresh" |
+| Calendar Color | _The color a Calendar is painted with in Google Calendar, returned by the API as a hex value; optionally used as the Banner's color (RF-13)._ | "calendar theme", "event color" |
 | Flight Speed | _The animation-speed preset (Slow/Normal/Fast) controlling how fast the Airplane crosses the Overlay; user-selectable from the menu bar and persisted across restarts._ | "animation speed", "duration" |
