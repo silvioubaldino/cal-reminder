@@ -4,7 +4,7 @@ type: spec
 status: done
 updated: 2026-08-14
 parents: [AYD-006]
-related: [GLO, REQ-01, SPEC-005]
+related: [GLO, REQ-01, SPEC-005, TDR-004]
 ---
 
 # SPEC-014: Banner painted with the Calendar Color — what + how

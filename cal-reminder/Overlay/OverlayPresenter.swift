@@ -48,9 +48,13 @@ final class DefaultOverlayAnimator: OverlayAnimating {
 
         let panel = OverlayPanel(screen: screen)
         let view = AirplaneBannerView(frame: CGRect(origin: .zero, size: screen.frame.size))
+        // Both colors are converted to the color space of the screen they'll be painted on,
+        // so a Calendar Color renders as the same tone the user sees in Google Calendar
+        // rather than as raw sRGB components on a wide-gamut display (TDR-004).
         let background = bannerBackgroundColor(for: calendarColorHex)
-        view.setBannerColor(background)
-        view.setBannerTextColor(background.readableBannerTextColor)
+        let textColor = background.readableBannerTextColor
+        view.setBannerColor(background.matchingDisplayColorSpace(screen.colorSpace))
+        view.setBannerTextColor(textColor.matchingDisplayColorSpace(screen.colorSpace))
         if skipOnClick {
             view.onSkipRequested = { [weak view] in view?.skipToEnd() }
         }

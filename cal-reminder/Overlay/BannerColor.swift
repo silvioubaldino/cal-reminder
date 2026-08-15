@@ -48,6 +48,17 @@ extension NSColor {
         )
     }
 
+    /// The same color, re-expressed in the color space the Banner will actually be drawn on
+    /// (RF-13). A Calendar Color is an **sRGB** hex, but a Mac's display is usually Display
+    /// P3: handing raw sRGB components to a layer paints them as if they were P3 native, so
+    /// the Banner comes out slightly more saturated than the same color in Google Calendar.
+    /// Converting first makes the two match — and is correct either way, since a color
+    /// already tagged with the display's space converts to itself.
+    func matchingDisplayColorSpace(_ colorSpace: NSColorSpace?) -> NSColor {
+        guard let colorSpace else { return self }
+        return usingColorSpace(colorSpace) ?? self
+    }
+
     /// The Banner text color that stays readable on top of `self` (RF-13): white on a dark
     /// Banner, near-black on a light one. Derived from perceived luminance rather than from
     /// Google's `foregroundColor`, which is tuned for its own web UI, not for this Banner.

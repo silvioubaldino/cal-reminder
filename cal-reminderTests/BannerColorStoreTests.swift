@@ -125,6 +125,27 @@ final class BannerColorStoreTests: XCTestCase {
         XCTAssertLessThan(onLight.brightnessComponent, 0.2)
     }
 
+    func test_convertsTheCalendarColorToTheDisplaysColorSpaceWithoutShiftingIt() throws {
+        // Arrange (TDR-004: sRGB components painted raw on a P3 display read oversaturated)
+        let calendarColor = try XCTUnwrap(NSColor(bannerHex: "#0b8043"))
+
+        // Act
+        let onWideGamut = calendarColor.matchingDisplayColorSpace(.displayP3)
+        let onSRGB = try XCTUnwrap(calendarColor.matchingDisplayColorSpace(.sRGB).usingColorSpace(.sRGB))
+        let untouched = calendarColor.matchingDisplayColorSpace(nil)
+
+        // Assert — the components change with the space, but the color itself doesn't:
+        // converted back to sRGB it is the Calendar Color again.
+        XCTAssertEqual(onWideGamut.colorSpace, .displayP3)
+        XCTAssertNotEqual(onWideGamut.greenComponent, 0x80 / 255.0, accuracy: 0.001)
+        let roundTripped = try XCTUnwrap(onWideGamut.usingColorSpace(.sRGB))
+        XCTAssertEqual(roundTripped.redComponent, 0x0B / 255.0, accuracy: 0.005)
+        XCTAssertEqual(roundTripped.greenComponent, 0x80 / 255.0, accuracy: 0.005)
+        XCTAssertEqual(roundTripped.blueComponent, 0x43 / 255.0, accuracy: 0.005)
+        XCTAssertEqual(onSRGB.greenComponent, 0x80 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(untouched, calendarColor)
+    }
+
     @MainActor
     func test_usesTheCalendarColorOnlyWhileMatchingIsOn() throws {
         // Arrange

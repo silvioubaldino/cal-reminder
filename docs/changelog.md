@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fixed the banner's tone on wide-gamut displays: a calendar's color is now drawn in the screen's own color space, so it matches the shade shown in Google Calendar instead of coming out oversaturated (TDR-004).
 - Implemented SPEC-014: each banner is now painted with the color of the calendar its event came from, with a "Match calendar color" toggle in the menu that falls back to the chosen color preset.
 - Designed AYD-006 and added RF-13: painting the banner with the calendar's own color, keeping the color preset as the fallback.
 - "Refresh now" now does a full resync: it refetches the whole upcoming window and rebuilds the reminder list, so entries for events that were deleted or rescheduled disappear.
