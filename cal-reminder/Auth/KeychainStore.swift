@@ -1,19 +1,24 @@
 import Foundation
 import Security
 
-/// Persists the OAuth refresh token securely (RNF-05: never in plaintext on disk).
-/// Wraps Keychain Services (the security boundary) so it can be faked in tests.
 protocol TokenStoring {
     func refreshToken() -> String?
     func setRefreshToken(_ token: String?)
 }
 
 final class KeychainStore: TokenStoring {
-    private let service: String
-    private let account = "google-refresh-token"
+    static let legacyAccount = "google-refresh-token"
 
-    init(service: String = "com.cal-reminder.auth") {
+    private let service: String
+    private let account: String
+
+    init(service: String = "com.cal-reminder.auth", account: String = KeychainStore.legacyAccount) {
         self.service = service
+        self.account = account
+    }
+
+    static func accountScopedKey(_ accountId: String) -> String {
+        "\(legacyAccount)#\(accountId)"
     }
 
     func refreshToken() -> String? {

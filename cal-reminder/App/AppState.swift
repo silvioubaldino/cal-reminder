@@ -1,23 +1,44 @@
 import Foundation
 
-/// Reflects a *verified* Google session, not just token presence (SPEC-010): `connecting`
-/// covers the startup/reconnect verification window; `needsReauth` means the stored
-/// refresh token was found dead (revoked/expired) and was cleared.
 enum ConnectionStatus: Equatable {
     case disconnected
     case connecting
-    case connected(email: String?)
+    case connected
     case needsReauth
 }
 
-/// Everything the MenuBar UI renders (RF-06): connection status, on/off, and the next
-/// upcoming Trigger.
+struct AccountState: Identifiable, Equatable {
+    let id: String
+    let label: String
+    var connectionStatus: ConnectionStatus
+    var calendars: [CalendarInfo] = []
+}
+
 struct AppState: Equatable {
-    var connectionStatus: ConnectionStatus = .disconnected
+    var accounts: [AccountState] = []
     var enabled = true
     var nextTrigger: Trigger?
-    /// True while a manual Poll (RF-12) triggered from the empty state is in flight.
     var refreshing = false
-    /// Every Calendar in the connected account, for the "Calendars" menu (RF-10).
-    var calendars: [CalendarInfo] = []
+
+    var statusTitle: String {
+        if accounts.isEmpty { return "Not connected" }
+
+        let needingReauth = accounts.filter { $0.connectionStatus == .needsReauth }.count
+        if accounts.allSatisfy({ $0.connectionStatus == .connecting }) { return "Connecting…" }
+
+        if accounts.count == 1 {
+            let account = accounts[0]
+            switch account.connectionStatus {
+            case .connected: return "Connected as \(account.label)"
+            case .connecting: return "Connecting…"
+            case .needsReauth: return "Reconnect needed"
+            case .disconnected: return "Not connected"
+            }
+        }
+
+        if needingReauth > 0 {
+            return "\(accounts.count) accounts · \(needingReauth) need\(needingReauth == 1 ? "s" : "") reconnecting"
+        }
+        return "Connected · \(accounts.count) accounts"
+    }
 }

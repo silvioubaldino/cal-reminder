@@ -3,7 +3,7 @@ id: ARCH
 type: architecture
 title: Architecture overview (living C4)
 status: approved
-updated: 2026-07-11
+updated: 2026-09-03
 parents: []
 related: []
 ---
@@ -24,8 +24,11 @@ flowchart TB
     subgraph app["cal-reminder (macOS menu bar app)"]
         ui["MenuBar UI"]
         coord["AppCoordinator"]
-        auth["AuthManager"]
-        cal["CalendarService"]
+        reg["AccountRegistry"]
+        subgraph session["AccountSession (one per connected Account)"]
+            auth["AuthManager"]
+            cal["CalendarService"]
+        end
         sched["Scheduler"]
         overlay["OverlayPresenter"]
     end
@@ -36,11 +39,11 @@ flowchart TB
     user -->|controls| ui
     user -->|sees| overlay
     ui --> coord
-    coord --> auth
-    coord --> cal
-    auth -->|OAuth token| keychain
+    coord --> reg
+    reg --> session
+    auth -->|OAuth token, scoped per Account| keychain
     cal -->|HTTPS · poll + syncToken| gcal
-    cal -->|Triggers| sched
+    reg -->|merged Triggers| sched
     sched -->|fire| overlay
     auth -.->|access token| cal
 ```
@@ -57,10 +60,11 @@ flowchart TB
 
 | Component | Responsibility | Detailed in |
 |-----------|----------------|-------------|
-| **MenuBar UI** | `NSStatusItem` menu: status, on/off, test, reconnect, Flight Speed, Banner color, Calendar selection, quit | AYD-001, AYD-002 |
-| **AppCoordinator** | Wires modules together; holds `AppState`; re-Polls on Calendar-selection changes | AYD-001, AYD-002 |
-| **AuthManager** | OAuth PKCE flow + token refresh + Keychain storage | AYD-001 |
-| **CalendarService** | List Calendars, Poll each selected Calendar (per-Calendar sync), parse Events, resolve Reminders → Triggers | AYD-001, AYD-002 |
+| **MenuBar UI** | `NSStatusItem` menu: status, on/off, test, Accounts submenu (add/reconnect/sign out per Account, Calendar selection per Account), Flight Speed, Banner color, quit | AYD-001, AYD-002, AYD-007 |
+| **AppCoordinator** | Wires modules together; holds `AppState`; re-Polls on Calendar-selection changes | AYD-001, AYD-002, AYD-007 |
+| **AccountRegistry** | Owns one `AccountSession` per connected Account; fans Poll out across them; handles add/reconnect/sign-out and the legacy single-account migration | AYD-007 |
+| **AuthManager** *(one per connected Account)* | OAuth PKCE flow + token refresh + Keychain storage, scoped to its Account | AYD-001, AYD-007 |
+| **CalendarService** *(one per connected Account)* | List that Account's Calendars, Poll each selected one (per-Calendar sync), parse Events, resolve Reminders → Triggers | AYD-001, AYD-002, AYD-007 |
 | **Scheduler** | Precise local timers per Trigger + dedupe + sleep/wake handling | AYD-001 |
 | **OverlayPresenter** | `NSPanel` over all windows + animation + FIFO queue | AYD-001 |
 

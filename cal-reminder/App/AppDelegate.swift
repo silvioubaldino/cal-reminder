@@ -5,7 +5,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenuController: StatusMenuController?
     private var coordinator: AppCoordinator?
     private let flightSpeedStore = UserDefaultsFlightSpeedStore()
-    private let calendarSelectionStore = UserDefaultsCalendarSelectionStore()
     private let skipOnClickStore = UserDefaultsSkipOnClickStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -13,21 +12,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             animator: DefaultOverlayAnimator(speedStore: flightSpeedStore, skipOnClickStore: skipOnClickStore)
         )
 
-        let authManager = AuthManager(
-            config: .embedded,
-            tokenStore: KeychainStore(),
-            httpClient: URLSessionHTTPClient(),
-            authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
-        )
-        let calendarAPI = GoogleCalendarAPI(authManager: authManager)
-        let calendarService = CalendarService(api: calendarAPI, selectionStore: calendarSelectionStore)
+        let accountRegistry = Self.makeAccountRegistry()
         let scheduler = Scheduler(onFire: { trigger in
             Task { await overlayPresenter.enqueue(trigger) }
         })
 
         let coordinator = AppCoordinator(
-            auth: authManager,
-            calendar: calendarService,
+            accounts: accountRegistry,
             scheduler: scheduler,
             overlay: overlayPresenter
         )
@@ -40,11 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onToggleEnabled: { [weak coordinator] in
                 coordinator?.toggleEnabled()
             },
-            onReconnect: { [weak coordinator] in
-                coordinator?.reconnect()
+            onReconnect: { [weak coordinator] accountId in
+                coordinator?.reconnect(accountId: accountId)
             },
-            onSignOut: { [weak coordinator] in
-                coordinator?.logout()
+            onSignOut: { [weak coordinator] accountId in
+                coordinator?.signOut(accountId: accountId)
             },
             onRefresh: { [weak coordinator] in
                 coordinator?.refreshNow()
@@ -52,8 +43,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onCalendarsChanged: { [weak coordinator] in
                 coordinator?.calendarsChanged()
             },
+            onAddAccount: { [weak coordinator] in
+                coordinator?.addAccount()
+            },
             speedStore: flightSpeedStore,
-            calendarSelectionStore: calendarSelectionStore,
+            calendarSelectionStore: { UserDefaultsCalendarSelectionStore(accountId: $0) },
             skipOnClickStore: skipOnClickStore
         )
         self.statusMenuController = statusMenuController
@@ -62,5 +56,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusMenuController?.render(state)
         }
         coordinator.start()
+    }
+
+    private static func makeAccountRegistry() -> AccountRegistry {
+        let scopedTokenStore: (String) -> TokenStoring = {
+            KeychainStore(account: KeychainStore.accountScopedKey($0))
+        }
+        let scopedCalendarSelectionStore: (String) -> CalendarSelectionStoring = {
+            UserDefaultsCalendarSelectionStore(accountId: $0)
+        }
+        let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating = { tokenStore in
+            AuthManager(
+                config: .embedded,
+                tokenStore: tokenStore,
+                httpClient: URLSessionHTTPClient(),
+                authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
+            )
+        }
+        let sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing) = { account, tokenStore, selectionStore in
+            let auth = AuthManager(
+                config: .embedded,
+                tokenStore: tokenStore,
+                httpClient: URLSessionHTTPClient(),
+                authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
+            )
+            let api = GoogleCalendarAPI(authManager: auth)
+            let calendar = CalendarService(api: api, accountId: account.id, selectionStore: selectionStore)
+            return (auth, calendar)
+        }
+
+        let factories = AccountSessionFactories(
+            scopedTokenStore: scopedTokenStore,
+            scopedCalendarSelectionStore: scopedCalendarSelectionStore,
+            provisionalAuthFactory: provisionalAuthFactory,
+            sessionFactory: sessionFactory
+        )
+
+        return AccountRegistry(
+            accountStore: UserDefaultsAccountStore(),
+            legacyMigration: LegacyAccountMigration(provisionalAuthFactory: provisionalAuthFactory),
+            factories: factories
+        )
     }
 }
