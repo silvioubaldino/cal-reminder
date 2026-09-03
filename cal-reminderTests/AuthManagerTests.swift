@@ -29,8 +29,6 @@ private final class StubAuthorizationCodeProvider: AuthorizationCodeProviding {
     }
 }
 
-/// Records requests and replays queued responses in order, so tests can script a
-/// sequence like "401, then 200 on retry" without a real network.
 private actor StubHTTPClient: HTTPClient {
     private var responses: [(Data, HTTPURLResponse)]
     private(set) var sentRequests: [URLRequest] = []
@@ -62,7 +60,6 @@ final class AuthManagerTests: XCTestCase {
     private let config = GoogleOAuthConfig(clientID: "client-id", clientSecret: "client-secret")
 
     func test_isConnected_falseWithoutRefreshToken() {
-        // Arrange
         let manager = AuthManager(
             config: config,
             tokenStore: FakeTokenStore(),
@@ -70,12 +67,10 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act / Assert
         XCTAssertFalse(manager.isConnected)
     }
 
     func test_connect_storesRefreshTokenAndConnects() async throws {
-        // Arrange
         let tokenStore = FakeTokenStore()
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
@@ -87,16 +82,13 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act
         try await manager.connect()
 
-        // Assert
         XCTAssertEqual(tokenStore.refreshToken(), "refresh-1")
         XCTAssertTrue(manager.isConnected)
     }
 
     func test_accessToken_reusesCachedTokenUntilExpiry() async throws {
-        // Arrange
         var now = Date(timeIntervalSince1970: 0)
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200))
@@ -109,12 +101,10 @@ final class AuthManagerTests: XCTestCase {
             clock: { now }
         )
 
-        // Act
         let first = try await manager.accessToken()
-        now = now.addingTimeInterval(60) // still well within the 3600s expiry
+        now = now.addingTimeInterval(60)
         let second = try await manager.accessToken()
 
-        // Assert
         XCTAssertEqual(first, "access-1")
         XCTAssertEqual(second, "access-1")
         let requestCount = await httpClient.sentRequests.count
@@ -122,7 +112,6 @@ final class AuthManagerTests: XCTestCase {
     }
 
     func test_accessToken_refreshesWhenExpired() async throws {
-        // Arrange
         var now = Date(timeIntervalSince1970: 0)
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", expiresIn: 60), httpResponse(status: 200)),
@@ -136,22 +125,19 @@ final class AuthManagerTests: XCTestCase {
             clock: { now }
         )
 
-        // Act
         _ = try await manager.accessToken()
-        now = now.addingTimeInterval(120) // past expiry
+        now = now.addingTimeInterval(120)
         let refreshed = try await manager.accessToken()
 
-        // Assert
         XCTAssertEqual(refreshed, "access-2")
     }
 
     func test_authorizedRequest_refreshesAndRetriesOnceOn401() async throws {
-        // Arrange
         let httpClient = StubHTTPClient(responses: [
-            (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200)), // initial accessToken()
-            (Data(), httpResponse(status: 401)), // first attempt with access-1
-            (tokenResponseData(accessToken: "access-2", expiresIn: 3600), httpResponse(status: 200)), // forced refresh
-            ("success".data(using: .utf8)!, httpResponse(status: 200)) // retry with access-2
+            (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200)),
+            (Data(), httpResponse(status: 401)),
+            (tokenResponseData(accessToken: "access-2", expiresIn: 3600), httpResponse(status: 200)),
+            ("success".data(using: .utf8)!, httpResponse(status: 200))
         ])
         let manager = AuthManager(
             config: config,
@@ -160,21 +146,18 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act
         let (data, response) = try await manager.authorizedRequest { token in
             URLRequest(url: URL(string: "https://www.googleapis.com/calendar/v3/calendars/primary")!)
         }
 
-        // Assert
         XCTAssertEqual(response.statusCode, 200)
         XCTAssertEqual(String(data: data, encoding: .utf8), "success")
     }
 
     func test_identity_decodesSubAndEmailFromUserInfoEndpoint() async throws {
-        // Arrange (RF-14/TDR-005: identity() resolves Google's immutable `sub`, not just email)
         let httpClient = StubHTTPClient(responses: [
-            (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200)), // accessToken()
-            (try! JSONSerialization.data(withJSONObject: ["sub": "1234567890", "email": "user@example.com"]), httpResponse(status: 200)) // userinfo
+            (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200)),
+            (try! JSONSerialization.data(withJSONObject: ["sub": "1234567890", "email": "user@example.com"]), httpResponse(status: 200))
         ])
         let manager = AuthManager(
             config: config,
@@ -183,18 +166,14 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act
         let account = try await manager.identity()
 
-        // Assert
         XCTAssertEqual(account.id, "google:1234567890")
         XCTAssertEqual(account.provider, .google)
         XCTAssertEqual(account.label, "user@example.com")
     }
 
     func test_connect_defaultAuthorizationURLOffersAnAccountChooserWithNoHint() async throws {
-        // Arrange (RF-14: without select_account, Google reuses the browser session and
-        // never offers a chooser — impossible to add a *second* Account)
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
         ])
@@ -206,10 +185,8 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: authProvider
         )
 
-        // Act
         try await manager.connect()
 
-        // Assert
         let url = try XCTUnwrap(authProvider.lastAuthorizationURL)
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         XCTAssertEqual(query.first { $0.name == "prompt" }?.value, "select_account consent")
@@ -217,7 +194,6 @@ final class AuthManagerTests: XCTestCase {
     }
 
     func test_connectLoginHint_addsLoginHintToTheAuthorizationURL() async throws {
-        // Arrange (RF-14: "Reconnect" on a specific Account pre-selects it)
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
         ])
@@ -229,17 +205,14 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: authProvider
         )
 
-        // Act
         try await manager.connect(loginHint: "user@example.com")
 
-        // Assert
         let url = try XCTUnwrap(authProvider.lastAuthorizationURL)
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         XCTAssertEqual(query.first { $0.name == "login_hint" }?.value, "user@example.com")
     }
 
     func test_connect_tokenExchangeCarriesClientCredentialsAndPKCE() async throws {
-        // Arrange
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
         ])
@@ -250,20 +223,16 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act
         try await manager.connect()
 
-        // Assert
         let sentRequests = await httpClient.sentRequests
         let body = String(data: sentRequests[0].httpBody ?? Data(), encoding: .utf8) ?? ""
-        // Google's installed-app token endpoint requires client_secret alongside PKCE (TDR-002).
         XCTAssertTrue(body.contains("client_secret=client-secret"), "Google requires client_secret on the exchange")
         XCTAssertTrue(body.contains("code_verifier="), "PKCE code_verifier must also be present")
         XCTAssertTrue(body.contains("client_id=client-id"))
     }
 
     func test_accessToken_throwsWhenNeverConnected() async {
-        // Arrange
         let manager = AuthManager(
             config: config,
             tokenStore: FakeTokenStore(),
@@ -271,19 +240,16 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act / Assert
         do {
             _ = try await manager.accessToken()
             XCTFail("expected notConnected to be thrown")
         } catch AuthError.notConnected {
-            // expected
         } catch {
             XCTFail("unexpected error: \(error)")
         }
     }
 
     func test_accessToken_refreshWithInvalidGrantClearsTokenAndThrowsRevoked() async {
-        // Arrange (SPEC-010: a dead refresh token must be cleared, not just fail loudly)
         let tokenStore = FakeTokenStore(initialToken: "refresh-1")
         let errorBody = try! JSONSerialization.data(withJSONObject: ["error": "invalid_grant"])
         let httpClient = StubHTTPClient(responses: [(errorBody, httpResponse(status: 400))])
@@ -294,12 +260,10 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act / Assert
         do {
             _ = try await manager.accessToken()
             XCTFail("expected refreshTokenRevoked to be thrown")
         } catch AuthError.refreshTokenRevoked {
-            // expected
         } catch {
             XCTFail("unexpected error: \(error)")
         }
@@ -308,8 +272,6 @@ final class AuthManagerTests: XCTestCase {
     }
 
     func test_accessToken_refreshFailureWithOtherErrorKeepsTokenAndThrowsTokenExchangeFailed() async {
-        // Arrange: a transient/server failure (not invalid_grant) must not be treated as a
-        // dead session (RNF-04) — the refresh token stays intact for the next attempt.
         let tokenStore = FakeTokenStore(initialToken: "refresh-1")
         let httpClient = StubHTTPClient(responses: [(Data(), httpResponse(status: 500))])
         let manager = AuthManager(
@@ -319,12 +281,10 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act / Assert
         do {
             _ = try await manager.accessToken()
             XCTFail("expected tokenExchangeFailed to be thrown")
         } catch AuthError.tokenExchangeFailed {
-            // expected
         } catch {
             XCTFail("unexpected error: \(error)")
         }
@@ -332,7 +292,6 @@ final class AuthManagerTests: XCTestCase {
     }
 
     func test_disconnect_clearsStoredToken() async {
-        // Arrange
         let tokenStore = FakeTokenStore(initialToken: "refresh-1")
         let manager = AuthManager(
             config: config,
@@ -341,10 +300,8 @@ final class AuthManagerTests: XCTestCase {
             authorizationCodeProvider: StubAuthorizationCodeProvider()
         )
 
-        // Act
         await manager.disconnect()
 
-        // Assert
         XCTAssertNil(tokenStore.refreshToken())
         XCTAssertFalse(manager.isConnected)
     }

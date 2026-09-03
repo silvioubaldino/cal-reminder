@@ -7,76 +7,57 @@ final class KeychainStoreTests: XCTestCase {
     }
 
     func test_returnsNilWhenNeverSet() {
-        // Arrange
         let store = makeStore()
 
-        // Act
         let token = store.refreshToken()
 
-        // Assert
         XCTAssertNil(token)
     }
 
     func test_roundTripsAToken() {
-        // Arrange
         let store = makeStore()
 
-        // Act
         store.setRefreshToken("refresh-token-value")
 
-        // Assert
         XCTAssertEqual(store.refreshToken(), "refresh-token-value")
     }
 
     func test_overwritesAPreviouslyStoredToken() {
-        // Arrange
         let store = makeStore()
         store.setRefreshToken("first-token")
 
-        // Act
         store.setRefreshToken("second-token")
 
-        // Assert
         XCTAssertEqual(store.refreshToken(), "second-token")
     }
 
     func test_settingNilDeletesTheToken() {
-        // Arrange
         let store = makeStore()
         store.setRefreshToken("some-token")
 
-        // Act
         store.setRefreshToken(nil)
 
-        // Assert
         XCTAssertNil(store.refreshToken())
     }
 
     func test_twoAccountsUnderTheSameServiceDontSeeEachOthersToken() {
-        // Arrange (RF-14/TDR-005: each connected Account gets its own Keychain entry)
         let service = "com.cal-reminder.auth.tests.\(UUID().uuidString)"
         let storeA = KeychainStore(service: service, account: KeychainStore.accountScopedKey("google:a"))
         let storeB = KeychainStore(service: service, account: KeychainStore.accountScopedKey("google:b"))
 
-        // Act
         storeA.setRefreshToken("token-a")
 
-        // Assert
         XCTAssertEqual(storeA.refreshToken(), "token-a")
         XCTAssertNil(storeB.refreshToken())
     }
 
     func test_defaultAccountStillReadsTheLegacyUnscopedEntry() {
-        // Arrange: the single-account build wrote under the default (legacy) account name —
-        // the default init parameter must keep reading/writing that same entry (TDR-005).
         let service = "com.cal-reminder.auth.tests.\(UUID().uuidString)"
         let legacyStore = KeychainStore(service: service)
 
-        // Act
         legacyStore.setRefreshToken("legacy-token")
         let reopened = KeychainStore(service: service, account: KeychainStore.legacyAccount)
 
-        // Assert
         XCTAssertEqual(reopened.refreshToken(), "legacy-token")
     }
 }

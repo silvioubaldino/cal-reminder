@@ -1,9 +1,5 @@
 import Cocoa
 
-/// A checkbox row for a "Calendars" submenu (RF-10). Uses a custom `NSMenuItem.view`
-/// instead of a plain item + action: `NSMenu` only auto-dismisses when a *menu item*
-/// sends its action, and a custom view's button click is handled entirely within the
-/// button's own tracking loop — so the menu stays open across multiple toggles.
 private final class CalendarCheckboxView: NSView {
     private let checkbox: NSButton
     private let onToggle: (Bool) -> Void
@@ -14,8 +10,6 @@ private final class CalendarCheckboxView: NSView {
         checkbox.state = isChecked ? .on : .off
         checkbox.sizeToFit()
 
-        // Frame-based, not Auto Layout: NSMenu reads `view.frame.size` directly to size
-        // the row — it never triggers a constraint-based layout pass for custom item views.
         let horizontalPadding: CGFloat = 18
         let verticalPadding: CGFloat = 2
         let size = NSSize(
@@ -39,10 +33,6 @@ private final class CalendarCheckboxView: NSView {
     }
 }
 
-/// Bridges a Swift closure to Cocoa's target/action mechanism for a plain `NSMenuItem`
-/// (Reconnect / Sign out / Add account). `NSMenuItem.target` isn't retained by the item, so
-/// each instance is also stashed in `representedObject` to keep it alive for the item's
-/// lifetime.
 private final class MenuItemAction: NSObject {
     private let action: () -> Void
 
@@ -55,8 +45,6 @@ private final class MenuItemAction: NSObject {
     }
 }
 
-/// The Accounts submenu's callbacks, bundled to keep `accountsMenu(for:...)`'s parameter
-/// count within SwiftLint's `function_parameter_count` limit.
 struct AccountsMenuActions {
     let onCalendarsChanged: () -> Void
     let onReconnect: (String) -> Void
@@ -64,12 +52,7 @@ struct AccountsMenuActions {
     let onAddAccount: () -> Void
 }
 
-/// Builds the "Accounts" submenu (RF-14): one submenu per connected Account — its Calendars,
-/// Reconnect, and Sign out — followed by "Add Google account…". A pure builder (no stored
-/// state) so it can be exercised headlessly in tests.
 enum AccountsMenuBuilder {
-    /// One Account's "Calendars" submenu (RF-10): a checkbox per Calendar, checked when
-    /// effectively selected.
     static func calendarsSubmenu(
         for account: AccountState,
         selectionStore: CalendarSelectionStoring,
@@ -97,7 +80,6 @@ enum AccountsMenuBuilder {
         return submenu
     }
 
-    /// The full "Accounts" submenu, from every connected Account's state.
     static func accountsMenu(
         for accounts: [AccountState],
         selectionStore: (String) -> CalendarSelectionStoring,

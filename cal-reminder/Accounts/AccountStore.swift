@@ -1,10 +1,6 @@
 import Foundation
 
-/// Persists the ordered list of connected Accounts (RF-14). Not a secret — the Keychain
-/// holds each Account's token; this is just identity + display metadata, so `UserDefaults`
-/// is the right boundary (same pattern as `CalendarSelectionStore`/`FlightSpeedStore`).
 protocol AccountStoring: AnyObject {
-    /// Ordered by connection order (first connected, first shown — AYD-007).
     var accounts: [Account] { get set }
 }
 

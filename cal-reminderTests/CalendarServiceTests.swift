@@ -5,18 +5,11 @@ private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     var calendars: [GoogleCalendarListEntry] = [
         GoogleCalendarListEntry(id: "primary", summary: "Primary", primary: true, accessRole: "owner", backgroundColor: nil)
     ]
-    /// Per-calendarId fixtures, keyed the same way the real API is keyed by `calendarId`.
     var events: [String: [GoogleEvent]] = [:]
     var nextSyncTokens: [String: String] = [:]
     var defaultReminders: [String: [GoogleCalendarDefaultReminder]?] = [:]
-    /// Calendar ids that should fail once with a 410 (expired syncToken) before succeeding.
     var expireTokenOnce: Set<String> = []
-    /// Calendar ids that always fail (e.g. access revoked mid-flight) — simulates a
-    /// persistently broken Calendar that must not take down the whole Poll.
     var alwaysFail: Set<String> = []
-    /// Calendar ids whose call fails because the session's refresh token is dead — unlike
-    /// `alwaysFail`, this must propagate out of `poll()` instead of being skipped, since
-    /// it's the whole session that's broken, not just this one Calendar (SPEC-010).
     var authRevokedFor: Set<String> = []
 
     private(set) var receivedCalendarIds: [String] = []
@@ -51,7 +44,7 @@ private final class StubCalendarSelectionStore: CalendarSelectionStoring {
 }
 
 final class CalendarServiceTests: XCTestCase {
-    private let fixedNow = Date(timeIntervalSince1970: 1_800_000_000) // 2027-01-15T08:00:00Z
+    private let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func timedEvent(
         id: String,
@@ -79,7 +72,6 @@ final class CalendarServiceTests: XCTestCase {
     }
 
     func test_onlyTimedEventsProduceTriggers() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         api.events["primary"] = [
             timedEvent(id: "evt-timed", title: "Standup", startDate: fixedNow.addingTimeInterval(600)),
@@ -88,16 +80,13 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(triggers.count, 1)
         XCTAssertEqual(triggers.first?.id, "acct1#primary#evt-timed#10")
     }
 
     func test_resolvesRemindersPerRN04() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         let start = fixedNow.addingTimeInterval(3600)
         api.events["primary"] = [
@@ -113,17 +102,14 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 15)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertTrue(triggers.contains { $0.id == "acct1#primary#evt-default#15" })
         XCTAssertTrue(triggers.contains { $0.id == "acct1#primary#evt-override#5" })
         XCTAssertFalse(triggers.contains { $0.id == "acct1#primary#evt-override#60" })
     }
 
     func test_oneTriggerPerPopupReminderWithCorrectFireDate() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         let start = fixedNow.addingTimeInterval(3600)
         api.events["primary"] = [
@@ -137,10 +123,8 @@ final class CalendarServiceTests: XCTestCase {
         ]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(triggers.count, 2)
         let byMinutes = Dictionary(uniqueKeysWithValues: triggers.map { ($0.minutesBefore, $0) })
         XCTAssertEqual(byMinutes[10]?.id, "acct1#primary#evt1#10")
@@ -150,72 +134,55 @@ final class CalendarServiceTests: XCTestCase {
     }
 
     func test_usesSyncTokenOnSubsequentPolls() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         api.nextSyncTokens["primary"] = "token-abc"
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         _ = try await service.poll()
         _ = try await service.poll()
 
-        // Assert
         XCTAssertEqual(api.receivedSyncTokens, [nil, "token-abc"])
     }
 
     func test_fullResyncPollDropsTheStoredSyncToken() async throws {
-        // Arrange (SPEC-013: the manual refresh refetches the whole window)
         let api = StubGoogleCalendarAPI()
         api.nextSyncTokens["primary"] = "token-abc"
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         _ = try await service.poll()
         _ = try await service.poll(fullResync: true)
         _ = try await service.poll()
 
-        // Assert: full call, then a full call again despite the stored token, then
-        // incremental from the token that full call returned.
         XCTAssertEqual(api.receivedSyncTokens, [nil, nil, "token-abc"])
     }
 
     func test_fullResyncKeepsTheCachedDefaultReminders() async throws {
-        // Arrange: the cached defaults aren't sync state — dropping them would break
-        // resolution (RN-04) if a later response omits them.
         let api = StubGoogleCalendarAPI()
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
         _ = try await service.poll()
 
-        // Act
         api.defaultReminders.updateValue(nil, forKey: "primary")
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(600))]
         let triggers = try await service.poll(fullResync: true)
 
-        // Assert
         XCTAssertEqual(triggers.first?.id, "acct1#primary#evt1#10")
     }
 
     func test_remembersDefaultRemindersWhenResponseOmitsThem() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         _ = try await service.poll()
-        // Store an explicit nil (not remove the key) to simulate a response that omits
-        // defaults — `dict[key] = nil` would instead delete the entry.
-        api.defaultReminders.updateValue(nil, forKey: "primary") // a response without defaults must not drop the last known
+        api.defaultReminders.updateValue(nil, forKey: "primary")
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(600))]
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(triggers.first?.id, "acct1#primary#evt1#10")
     }
 
     func test_stampsEachCalendarsColorOnItsTriggers() async throws {
-        // Arrange (RF-13: the Calendar Color travels on the Trigger to fire time)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: "#0b8043"),
@@ -227,10 +194,8 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         let triggerA = try XCTUnwrap(triggers.first(where: { $0.id == "acct1#A#evt-a#10" }))
         let triggerB = try XCTUnwrap(triggers.first(where: { $0.id == "acct1#B#evt-b#10" }))
         XCTAssertEqual(triggerA.calendarColorHex, "#0b8043")
@@ -238,7 +203,6 @@ final class CalendarServiceTests: XCTestCase {
     }
 
     func test_defaultSelectionPollsEveryCalendar() async throws {
-        // Arrange (RF-10: never-chosen selection = all Calendars)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
@@ -250,16 +214,13 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(selectedCalendarIds: nil), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(Set(api.receivedCalendarIds), ["A", "B"])
         XCTAssertEqual(Set(triggers.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
     }
 
     func test_onlySelectedCalendarsArePolled() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
@@ -271,16 +232,13 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(selectedCalendarIds: ["A"]), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(api.receivedCalendarIds, ["A"])
         XCTAssertEqual(triggers.map(\.id), ["acct1#A#evt-a#10"])
     }
 
     func test_dedupeIdsArePrefixedWithCalendarId() async throws {
-        // Arrange (same eventId in two Calendars must not collide, RN-03)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
@@ -293,33 +251,27 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(triggers.count, 2)
         XCTAssertEqual(Set(triggers.map(\.id)), ["acct1#A#\(sharedEventId)#10", "acct1#B#\(sharedEventId)#10"])
     }
 
     func test_dedupeIdsArePrefixedWithAccountId() async throws {
-        // Arrange (RF-14/RN-03: the same Calendar id shared by two Accounts must not collide)
         let api = StubGoogleCalendarAPI()
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let serviceA = CalendarService(api: api, accountId: "acctA", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
         let serviceB = CalendarService(api: api, accountId: "acctB", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggersA = try await serviceA.poll()
         let triggersB = try await serviceB.poll()
 
-        // Assert
         XCTAssertEqual(triggersA.map(\.id), ["acctA#primary#evt1#10"])
         XCTAssertEqual(triggersB.map(\.id), ["acctB#primary#evt1#10"])
     }
 
     func test_perCalendarSyncTokenIsolation() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
@@ -328,11 +280,9 @@ final class CalendarServiceTests: XCTestCase {
         api.nextSyncTokens["A"] = "token-a"
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         _ = try await service.poll()
         _ = try await service.poll()
 
-        // Assert: A's second call carries its token; B never received a token.
         let aTokens = zip(api.receivedCalendarIds, api.receivedSyncTokens).filter { $0.0 == "A" }.map(\.1)
         let bTokens = zip(api.receivedCalendarIds, api.receivedSyncTokens).filter { $0.0 == "B" }.map(\.1)
         XCTAssertEqual(aTokens, [nil, "token-a"])
@@ -340,7 +290,6 @@ final class CalendarServiceTests: XCTestCase {
     }
 
     func test_expiredSyncTokenDropsAndRetriesOnce() async throws {
-        // Arrange
         let api = StubGoogleCalendarAPI()
         api.calendars = [GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil)]
         api.expireTokenOnce = ["A"]
@@ -348,18 +297,14 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert: first call (410) then a retry without a token, and Triggers still resolve.
         XCTAssertEqual(api.receivedCalendarIds, ["A", "A"])
         XCTAssertEqual(api.receivedSyncTokens, [nil, nil])
         XCTAssertEqual(triggers.map(\.id), ["acct1#A#evt-a#10"])
     }
 
     func test_oneCalendarFailingDoesNotFailTheWholePoll() async throws {
-        // Arrange: a persistently broken Calendar (e.g. access revoked) must not prevent
-        // Triggers from every other selected Calendar from coming back.
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
@@ -370,33 +315,26 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act
         let triggers = try await service.poll()
 
-        // Assert
         XCTAssertEqual(triggers.map(\.id), ["acct1#A#evt-a#10"])
     }
 
     func test_authRevokedErrorPropagatesOutOfPoll() async throws {
-        // Arrange: a dead refresh token breaks the whole session, not just one Calendar —
-        // must propagate (unlike `test_oneCalendarFailingDoesNotFailTheWholePoll`).
         let api = StubGoogleCalendarAPI()
         api.authRevokedFor = ["primary"]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), clock: { self.fixedNow })
 
-        // Act / Assert
         do {
             _ = try await service.poll()
             XCTFail("expected AuthError.refreshTokenRevoked to propagate")
         } catch AuthError.refreshTokenRevoked {
-            // expected
         } catch {
             XCTFail("unexpected error: \(error)")
         }
     }
 
     func test_availableCalendarsMapsListCalendarsToDomainType() async throws {
-        // Arrange (accessRole filtering itself is GoogleCalendarAPI's job, covered in GoogleCalendarAPITests)
         let api = StubGoogleCalendarAPI()
         api.calendars = [
             GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
@@ -404,10 +342,8 @@ final class CalendarServiceTests: XCTestCase {
         ]
         let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore())
 
-        // Act
         let available = try await service.availableCalendars()
 
-        // Assert
         XCTAssertEqual(available, [
             CalendarInfo(id: "A", title: "A", isPrimary: true),
             CalendarInfo(id: "B", title: "B", isPrimary: false)

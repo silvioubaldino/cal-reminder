@@ -1,7 +1,5 @@
 import Foundation
 
-/// One connected Account's live state, as read by `AppCoordinator` to build `AppState`
-/// (RF-14). A snapshot — mutated only through `AccountRegistry`'s own methods.
 struct AccountSession: Identifiable {
     let account: Account
     var connectionStatus: ConnectionStatus
@@ -10,55 +8,24 @@ struct AccountSession: Identifiable {
     var id: String { account.id }
 }
 
-/// Owns every connected Account's session and is what `AppCoordinator` talks to instead of
-/// a single app-wide `auth`/`calendar` pair (AYD-007).
 protocol AccountsManaging: AnyObject {
-    /// Ordered like `AccountStore`; each session's `connectionStatus`/`calendars` reflect
-    /// the last `restore()`/`verifySessions()`/`poll()` call.
     var sessions: [AccountSession] { get }
 
-    /// Loads persisted Accounts (running the legacy single-account migration first) and
-    /// builds their sessions. Called once, at launch.
     func restore() async
-    /// Re-verifies every session's connection (startup/reconnect window).
     func verifySessions() async
-    /// Starts the OAuth flow for a brand-new Account. Updates the existing session instead
-    /// of duplicating one if the resolved identity is already connected.
     func addAccount(provider: AccountProvider) async throws -> Account
-    /// Re-authorizes one Account, pre-selecting it in Google's account chooser. If the
-    /// resolved identity turns out to be a *different* Account, that Account is
-    /// registered/updated instead — `accountId`'s stored token is never touched in that case.
     func reconnect(accountId: String) async throws
-    /// Removes one Account entirely: its Keychain entry, its Calendar selection, and its
-    /// session. The other Accounts are untouched.
     func signOut(accountId: String) async
-    /// Fans a Poll out across every session, merging their Triggers. A session's failure
-    /// only updates that session's `connectionStatus` — the others' Triggers still return
-    /// (mirrors how `CalendarService.poll()` already isolates a single Calendar's failure).
-    /// `anyAccountSucceeded` tells the caller whether *any* session's fetch actually
-    /// completed this round — a full resync (SPEC-013) must not wipe the Scheduler's armed
-    /// set on a total outage across every Account (RNF-04), the same guarantee the
-    /// single-account build made by never reaching `cancelAll()` when the whole Poll threw.
     func poll(fullResync: Bool) async -> (triggers: [Trigger], anyAccountSucceeded: Bool)
 }
 
-/// The per-Account factories `AccountRegistry` needs, bundled to keep its initializer's
-/// parameter count within SwiftLint's `function_parameter_count` limit.
 struct AccountSessionFactories {
-    /// Builds the real, Account-scoped Keychain-backed token store for an Account id.
     let scopedTokenStore: (String) -> TokenStoring
-    /// Builds the real, Account-scoped Calendar-selection store for an Account id.
     let scopedCalendarSelectionStore: (String) -> CalendarSelectionStoring
-    /// Builds a provisional `AccountAuthenticating` over an in-memory token store, used to
-    /// resolve identity before committing anything to the Keychain (`addAccount`/`reconnect`).
     let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating
-    /// Builds the live `auth`/`calendar` pair for an Account on top of its already-scoped
-    /// token + Calendar-selection stores.
     let sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing)
 }
 
-/// Not actor-isolated, like `CalendarService` — safe because `AppCoordinator` (its only
-/// caller) is itself `@MainActor` and never calls into this concurrently.
 final class AccountRegistry: AccountsManaging {
     private struct Live {
         let auth: AccountAuthenticating
@@ -113,8 +80,6 @@ final class AccountRegistry: AccountsManaging {
         }
     }
 
-    /// `provider` is currently always `.google` — kept explicit so a future non-Google
-    /// source doesn't need this signature to change (AYD-007 "Open questions").
     func addAccount(provider: AccountProvider) async throws -> Account {
         try await connectAndCommit(loginHint: nil)
     }
@@ -148,19 +113,12 @@ final class AccountRegistry: AccountsManaging {
                 print("[AccountRegistry] poll: \(account.id) needs reauth")
                 statuses[account.id] = .needsReauth
             } catch {
-                // A single Account's transient failure must not drop the others' Triggers
-                // (RNF-04) — leave its connectionStatus as-is and move on, mirroring how
-                // CalendarService.poll() already isolates one Calendar's failure.
                 print("[AccountRegistry] poll failed for \(account.id): \(error)")
             }
         }
         return (triggers, anySucceeded)
     }
 
-    /// Resolves identity through a provisional, in-memory-token OAuth flow, then commits
-    /// the result: writes the token to the resolved Account's real Keychain entry and
-    /// upserts its session — updating an already-connected Account (same id) rather than
-    /// duplicating it (AYD-007 "add Account" / "reconnect" flow).
     private func connectAndCommit(loginHint: String?) async throws -> Account {
         let provisionalToken = InMemoryTokenStore()
         let provisionalAuth = factories.provisionalAuthFactory(provisionalToken)

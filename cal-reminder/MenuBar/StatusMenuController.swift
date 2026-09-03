@@ -1,8 +1,5 @@
 import Cocoa
 
-/// The `NSStatusItem` menu (RF-06): connection status, next upcoming Trigger, Pause/Resume,
-/// test animation, Flight Speed, Banner color, the per-Account "Accounts" submenu (RF-14),
-/// and Quit. `render(_:)` reflects the `AppCoordinator`'s `AppState` after every change.
 final class StatusMenuController {
     private let statusItem: NSStatusItem
     private let onTestAnimation: () -> Void
@@ -15,8 +12,6 @@ final class StatusMenuController {
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
     private let matchCalendarColorStore: MatchCalendarColorStoring
-    /// Builds the Calendar-selection store for a given Account id (RF-14) — a factory, not
-    /// a fixed store, since which Accounts exist changes at runtime.
     private let calendarSelectionStore: (String) -> CalendarSelectionStoring
     private let skipOnClickStore: SkipOnClickStoring
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
@@ -64,15 +59,11 @@ final class StatusMenuController {
         buildMenu()
     }
 
-    /// Reflects the coordinator's `AppState` in the menu (RF-06 status + next Trigger +
-    /// RF-14 Accounts submenu).
     func render(_ state: AppState) {
         statusLabel.title = state.statusTitle
 
         toggleItem.title = state.enabled ? "Pause" : "Resume"
 
-        // A plain status row — never clickable; the "Refresh now" item below is the only
-        // manual-refresh control (RF-12), and it stays available regardless of this text.
         if let next = state.nextTrigger {
             let time = DateFormatter.localizedString(from: next.startDate, dateStyle: .none, timeStyle: .short)
             nextTriggerLabel.title = "Next: \(next.eventTitle) \(time)"
@@ -80,8 +71,6 @@ final class StatusMenuController {
             nextTriggerLabel.title = "No upcoming reminders"
         }
 
-        // Always enabled so a stale Poll can be corrected manually even when a Trigger is
-        // already upcoming (RF-12); only disabled while its own Poll is actually in flight.
         refreshItem.title = state.refreshing ? "Refreshing…" : "Refresh now"
         refreshItem.isEnabled = !state.refreshing
 
@@ -142,7 +131,6 @@ final class StatusMenuController {
         statusItem.menu = menu
     }
 
-    /// "Flight Speed" submenu with the 3 presets (RF-07); the current preset is checked.
     private func flightSpeedMenuItem() -> NSMenuItem {
         let submenu = NSMenu()
         let currentSpeed = speedStore.flightSpeed
@@ -165,8 +153,6 @@ final class StatusMenuController {
         return speedMenuItem
     }
 
-    /// "Banner Color" submenu (RF-07): the "Match calendar color" toggle (RF-13) first, then
-    /// the color presets — which stay live as the fallback whenever no Calendar Color applies.
     private func bannerColorMenuItem() -> NSMenuItem {
         let submenu = NSMenu()
         let currentColor = colorStore.bannerColor
@@ -200,9 +186,6 @@ final class StatusMenuController {
         return colorMenuItem
     }
 
-    /// "Click anywhere to skip" checkbox (RF-09); checked state mirrors the store, and
-    /// unchecking it makes the Overlay click-through for the whole flight, so the
-    /// Airplane finishes its trajectory instead of being skippable.
     private func skipOnClickMenuItem() -> NSMenuItem {
         let item = NSMenuItem(
             title: "Click anywhere to skip",

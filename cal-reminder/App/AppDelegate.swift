@@ -58,9 +58,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.start()
     }
 
-    /// Builds the real `AccountRegistry`: one `AuthManager` + `GoogleCalendarAPI` +
-    /// `CalendarService` triple per connected Account, each backed by its own
-    /// Account-scoped Keychain entry and Calendar-selection store (TDR-005).
     private static func makeAccountRegistry() -> AccountRegistry {
         let scopedTokenStore: (String) -> TokenStoring = {
             KeychainStore(account: KeychainStore.accountScopedKey($0))

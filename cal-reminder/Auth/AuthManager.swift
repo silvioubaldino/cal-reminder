@@ -4,29 +4,17 @@ enum AuthError: Error {
     case notConnected
     case tokenExchangeFailed
     case userInfoFetchFailed
-    /// The stored refresh token was rejected by Google (`invalid_grant`) — the session is
-    /// dead, not merely unreachable. Thrown after the dead token has already been cleared
-    /// from the Keychain (SPEC-010), so callers should move straight to `needsReauth`.
     case refreshTokenRevoked
 }
 
-/// The narrow slice of auth the `AccountRegistry` depends on (AYD-007) — deliberately smaller
-/// than `AuthManaging`: a future non-OAuth Calendar source (out of scope, see AYD-007 "Open
-/// questions") would only ever need to implement this, not `accessToken()`/`authorizedRequest()`.
 protocol AccountAuthenticating {
     var isConnected: Bool { get }
-    /// Starts the OAuth flow. `loginHint` pre-selects an account in Google's account chooser
-    /// (used by "Reconnect" on a specific Account, RF-14) — `nil` lets the user pick freely.
     func connect(loginHint: String?) async throws
-    /// Resolves the connected session's `Account` identity (RF-14) — Google's own immutable
-    /// account id plus the email shown in the menu bar (RF-06).
     func identity() async throws -> Account
-    /// Clears the stored refresh token and cached access token (RF-06 "Sign out").
     func disconnect() async
 }
 
 extension AccountAuthenticating {
-    /// Starts the OAuth flow letting the user pick freely (no pre-selected account).
     func connect() async throws {
         try await connect(loginHint: nil)
     }
@@ -34,8 +22,6 @@ extension AccountAuthenticating {
 
 protocol AuthManaging: AccountAuthenticating {
     func accessToken() async throws -> String
-    /// Builds a request with a fresh access token, sends it, and — on a 401 — refreshes
-    /// the access token once and retries transparently (AYD-001 AuthManager contract).
     func authorizedRequest(_ makeRequest: (_ accessToken: String) -> URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
@@ -53,7 +39,6 @@ actor AuthManager: AuthManaging {
     }
 
     private struct UserInfoResponse: Decodable {
-        /// Google's own immutable account id — the stable half of `Account.id` (TDR-005).
         let sub: String
         let email: String
     }
@@ -147,8 +132,6 @@ actor AuthManager: AuthManaging {
             }
             return tokens.accessToken
         } catch AuthError.refreshTokenRevoked {
-            // The session is dead, not merely unreachable: clear the dead token so
-            // `isConnected` stops lying about having a usable session (SPEC-010).
             tokenStore.setRefreshToken(nil)
             cachedAccessToken = nil
             cachedAccessTokenExpiry = nil
@@ -172,8 +155,6 @@ actor AuthManager: AuthManaging {
                 "code_verifier": verifier
             ])
         } catch is TokenRequestFailure {
-            // A rejected authorization code (bad/expired/reused) is a failed exchange, not a
-            // dead session — there is no refresh token yet to call "revoked".
             throw AuthError.tokenExchangeFailed
         }
     }
@@ -191,10 +172,6 @@ actor AuthManager: AuthManaging {
         }
     }
 
-    /// Raw non-200 outcome of a token-endpoint call, before the caller decides what it means
-    /// (revoked session vs. a plain failed exchange) — `requestToken` is shared by both the
-    /// code exchange and the refresh flow, which interpret the same `invalid_grant` body
-    /// differently.
     private struct TokenRequestFailure: Error {
         let status: Int
         let data: Data
@@ -219,10 +196,6 @@ actor AuthManager: AuthManaging {
         return try JSONDecoder().decode(TokenResponse.self, from: data)
     }
 
-    /// `prompt=select_account consent` (was `consent` alone): without `select_account`, Google
-    /// silently reuses the browser's existing session cookie and never offers a chooser, which
-    /// would make it impossible to add a *second* Google Account (RF-14). `loginHint` further
-    /// pre-selects an account — used by "Reconnect" on a specific Account.
     private static func authorizationURL(clientID: String, redirectURI: String, codeChallenge: String, loginHint: String?) -> URL {
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         var queryItems = [
