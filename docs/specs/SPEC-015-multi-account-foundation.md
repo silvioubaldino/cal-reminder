@@ -235,8 +235,13 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
      `"Connected · N accounts"` (N ≥ 2, all connected),
      `"N accounts · M need reconnecting"` (any `.needsReauth` present).
 10. **`App/AppCoordinator.swift`** — replace the `auth`/`calendar` properties with a
-    single `accounts: AccountsManaging`. `start()`: `await accounts.restore()` → notify →
-    `await accounts.verifySessions()` → notify → `await poll()`. `poll(fullResync:)`: `let
+    single `accounts: AccountsManaging`. `PollLoop.start()` always fires its first tick
+    immediately with no initial delay, which is what gave the single-account build a
+    prompt poll at launch without `start()` ever calling `poll()` explicitly; a Poll now
+    genuinely depends on `restore()` having populated the registry first, so that one-time
+    `restore()` → notify → `verifySessions()` → notify setup is folded into `pollLoop`'s
+    first tick (guarded by a `didRestore` flag) rather than raced in a second, parallel
+    `Task` — doing both loses the guarantee and double-Polls on launch. `poll(fullResync:)`: `let
     result = await accounts.poll(fullResync:)`; `scheduler.cancelAll()` only runs when
     `fullResync && result.anyAccountSucceeded` (a total outage across every Account must
     not wipe the armed set, RNF-04); then `scheduler.schedule(result.triggers)`, and

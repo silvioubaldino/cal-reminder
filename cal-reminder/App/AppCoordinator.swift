@@ -9,6 +9,9 @@ final class AppCoordinator {
     private let scheduler: Scheduling
     private let overlay: OverlayPresenter
     private let pollLoop: PollLoop
+    /// Guards the one-time `restore()`/`verifySessions()` setup folded into `pollLoop`'s
+    /// first tick (see `start()`).
+    private var didRestore = false
 
     private(set) var state = AppState()
     var onStateChange: ((AppState) -> Void)?
@@ -23,19 +26,28 @@ final class AppCoordinator {
         self.scheduler = scheduler
         self.overlay = overlay
         self.pollLoop = PollLoop(interval: pollInterval)
-        pollLoop.onPoll = { [weak self] in await self?.poll() }
+        // `PollLoop.start()` always fires its first tick immediately (no initial delay) —
+        // that's what gave the single-account build a prompt poll at launch without a
+        // separate explicit call. Now that a Poll genuinely depends on `restore()` having
+        // populated the registry first (unlike the old design, where Poll and session
+        // verification were independent), that one-time setup is folded into the first
+        // tick here instead of racing it in a second, parallel Task.
+        pollLoop.onPoll = { [weak self] in
+            guard let self else { return }
+            if !self.didRestore {
+                self.didRestore = true
+                await self.accounts.restore()
+                self.syncAccountsState()
+                self.notify()
+                await self.accounts.verifySessions()
+                self.syncAccountsState()
+                self.notify()
+            }
+            await self.poll()
+        }
     }
 
     func start() {
-        Task {
-            await accounts.restore()
-            syncAccountsState()
-            notify()
-            await accounts.verifySessions()
-            syncAccountsState()
-            notify()
-            await poll()
-        }
         pollLoop.start()
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
