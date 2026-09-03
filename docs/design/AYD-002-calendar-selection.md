@@ -1,11 +1,12 @@
 ---
 id: AYD-002
 type: design
-status: draft
+status: superseded
 updated: 2026-07-11
 parents: [REQ-10]
 children: [SPEC-005]
 related: [GLO, AYD-001]
+superseded_by: AYD-007
 ---
 
 # AYD-002: Calendar selection

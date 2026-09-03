@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-08-14
+updated: 2026-09-03
 ---
 
 # Changelog
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Designed AYD-007: connecting more than one Google Account at the same time, each with its own Calendar selection; superseded AYD-002 (single-account Calendar selection) and added RF-14, the Account glossary term, and a technical decision on account identity and storage scoping (TDR-005).
 - Fixed the banner's tone on wide-gamut displays: a calendar's color is now drawn in the screen's own color space, so it matches the shade shown in Google Calendar instead of coming out oversaturated (TDR-004).
 - Implemented SPEC-014: each banner is now painted with the color of the calendar its event came from, with a "Match calendar color" toggle in the menu that falls back to the chosen color preset.
 - Designed AYD-006 and added RF-13: painting the banner with the calendar's own color, keeping the color preset as the fallback.
