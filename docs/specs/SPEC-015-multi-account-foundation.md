@@ -1,7 +1,7 @@
 ---
 id: SPEC-015
 type: spec
-status: draft
+status: done
 parents: [AYD-007]
 related: [GLO, AYD-002, SPEC-005]
 updated: 2026-09-03
@@ -294,15 +294,15 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
   - `CalendarServiceTests`: `Trigger.id` carries the injected `accountId` prefix.
 
 ## Checklist
-- [ ] Two connected Accounts both contribute Triggers, prefixed correctly (`AccountRegistryTests`)
-- [ ] A Calendar id shared by two Accounts produces two distinct Triggers (`AccountRegistryTests`)
-- [ ] A revoked/unreachable Account doesn't affect the other's Triggers or status (`AccountRegistryTests`)
-- [ ] A total outage across every Account during a full resync leaves the armed Triggers untouched (`AccountRegistryTests`, `AppCoordinatorTests`)
-- [ ] Adding an Account already connected updates it instead of duplicating it (`AccountRegistryTests`)
-- [ ] Reconnecting that resolves to a different identity registers that identity, not the old one (`AccountRegistryTests`)
-- [ ] Signing out one Account leaves the others' stored data untouched (`AccountRegistryTests`)
-- [ ] Legacy single-account token/selection migrate silently on first restore (`AccountRegistryTests`)
-- [ ] A dead legacy token is cleared without registering an Account (`AccountRegistryTests`)
-- [ ] A network failure during migration defers it to the next launch (`AccountRegistryTests`)
-- [ ] `statusTitle` reads correctly for 0/1/N accounts and a needs-reconnect mix (`AppStateTests`)
+- [x] Two connected Accounts both contribute Triggers, prefixed correctly (`AccountRegistryTests`)
+- [x] A Calendar id shared by two Accounts produces two distinct Triggers (`AccountRegistryTests`)
+- [x] A revoked/unreachable Account doesn't affect the other's Triggers or status (`AccountRegistryTests`)
+- [x] A total outage across every Account during a full resync leaves the armed Triggers untouched (`AccountRegistryTests`, `AppCoordinatorTests`)
+- [x] Adding an Account already connected updates it instead of duplicating it (`AccountRegistryTests`)
+- [x] Reconnecting that resolves to a different identity registers that identity, not the old one (`AccountRegistryTests`)
+- [x] Signing out one Account leaves the others' stored data untouched (`AccountRegistryTests`)
+- [x] Legacy single-account token/selection migrate silently on first restore (`AccountRegistryTests`)
+- [x] A dead legacy token is cleared without registering an Account (`AccountRegistryTests`)
+- [x] A network failure during migration defers it to the next launch (`AccountRegistryTests`)
+- [x] `statusTitle` reads correctly for 0/1/N accounts and a needs-reconnect mix (`AppStateTests`)
 - [ ] The existing single-account UI flow (menu, Poll, Reconnect, Sign out) still works end to end (manual)

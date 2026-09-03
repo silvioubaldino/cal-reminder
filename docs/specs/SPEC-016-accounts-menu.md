@@ -1,7 +1,7 @@
 ---
 id: SPEC-016
 type: spec
-status: draft
+status: done
 parents: [AYD-007]
 related: [GLO, SPEC-015, SPEC-005]
 updated: 2026-09-03
@@ -122,8 +122,7 @@ today) and a new `onAddAccount`.
 - `cal-reminder/MenuBar/AccountsMenuBuilder.swift` *(new)*
 - `cal-reminder/MenuBar/StatusMenuController.swift`
 - `cal-reminder/App/AppDelegate.swift`
-- `cal-reminderTests/AccountsMenuBuilderTests.swift` *(new, if menu-construction logic
-  is testable without a real `NSStatusItem`; otherwise this stays manual — see Tests)*
+- `cal-reminderTests/AccountsMenuBuilderTests.swift` *(new)*
 
 ## Tests
 - **Acceptance:** the menu-rendering scenarios above (empty/one/two Accounts, per-Account
@@ -131,11 +130,14 @@ today) and a new `onAddAccount`.
   **manually** — `NSMenu` construction isn't practically unit-testable without a running
   `NSApplication`, same reasoning `SPEC-005`'s checklist already applied to its Calendars
   submenu.
-- **Unit:** if `AccountsMenuBuilder`'s pure `accountsMenu(for:...)` function can be called
-  headless in the test target (constructing `NSMenu`/`NSMenuItem` doesn't require a
-  running app), cover: row count matches `accounts.count` + the trailing "Add" item;
-  empty `accounts` renders only "Add Google account…"; a `.needsReauth` Account's title
-  carries the warning marker.
+- **Unit:** `AccountsMenuBuilder`'s pure `accountsMenu(for:...)`/`calendarsSubmenu(for:...)`
+  functions turned out callable headless (constructing `NSMenu`/`NSMenuItem` doesn't need a
+  running app) — `AccountsMenuBuilderTests` covers: row count for 0/2 Accounts; the trailing
+  "Add Google account…" item; a `.needsReauth` Account's title carrying the warning marker;
+  each Account row's submenu structure (Calendars / separator / Reconnect / Sign out); the
+  Calendars submenu's empty-state placeholder and one row per Calendar. What it can't cover
+  headlessly — actual click dispatch through `NSMenuItem.target`/`action`, and the resulting
+  re-Poll/reconnect/sign-out wiring — stays manual, per the Checklist.
 
 ## Checklist
 - [ ] Menu with 0 Accounts shows "Not connected" and only "Add Google account…" (manual)
