@@ -9,11 +9,21 @@ protocol TokenStoring {
 }
 
 final class KeychainStore: TokenStoring {
-    private let service: String
-    private let account = "google-refresh-token"
+    /// The legacy, unscoped Keychain account name — used by the single-account build and
+    /// read once more by `LegacyAccountMigration` (TDR-005).
+    static let legacyAccount = "google-refresh-token"
 
-    init(service: String = "com.cal-reminder.auth") {
+    private let service: String
+    private let account: String
+
+    init(service: String = "com.cal-reminder.auth", account: String = KeychainStore.legacyAccount) {
         self.service = service
+        self.account = account
+    }
+
+    /// The per-Account Keychain entry name (TDR-005): `google-refresh-token#<accountId>`.
+    static func accountScopedKey(_ accountId: String) -> String {
+        "\(legacyAccount)#\(accountId)"
     }
 
     func refreshToken() -> String? {

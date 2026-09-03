@@ -28,24 +28,29 @@ extension CalendarSelectionStoring {
 }
 
 final class UserDefaultsCalendarSelectionStore: CalendarSelectionStoring {
-    private static let key = "selectedCalendarIds"
+    /// The legacy, unscoped key — used by the single-account build and read once more by
+    /// `LegacyAccountMigration` (TDR-005).
+    static let legacyKey = "selectedCalendarIds"
 
+    private let key: String
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    /// Scopes the selection to one Account (`selectedCalendarIds.<accountId>`, TDR-005).
+    init(accountId: String, defaults: UserDefaults = .standard) {
+        self.key = "\(Self.legacyKey).\(accountId)"
         self.defaults = defaults
     }
 
     var selectedCalendarIds: Set<String>? {
         get {
-            guard let stored = defaults.array(forKey: Self.key) as? [String] else { return nil }
+            guard let stored = defaults.array(forKey: key) as? [String] else { return nil }
             return Set(stored)
         }
         set {
             if let newValue {
-                defaults.set(Array(newValue), forKey: Self.key)
+                defaults.set(Array(newValue), forKey: key)
             } else {
-                defaults.removeObject(forKey: Self.key)
+                defaults.removeObject(forKey: key)
             }
         }
     }

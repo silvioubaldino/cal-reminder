@@ -2,10 +2,10 @@ import XCTest
 @testable import cal_reminder
 
 final class CalendarSelectionStoreTests: XCTestCase {
-    private func makeStore() -> UserDefaultsCalendarSelectionStore {
+    private func makeStore(accountId: String = "google:test-account") -> UserDefaultsCalendarSelectionStore {
         let suiteName = "CalendarSelectionStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        return UserDefaultsCalendarSelectionStore(defaults: defaults)
+        return UserDefaultsCalendarSelectionStore(accountId: accountId, defaults: defaults)
     }
 
     func test_defaultsToNilWhenUnset() {
@@ -59,14 +59,43 @@ final class CalendarSelectionStoreTests: XCTestCase {
         // Arrange
         let suiteName = "CalendarSelectionStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        let store = UserDefaultsCalendarSelectionStore(defaults: defaults)
+        let store = UserDefaultsCalendarSelectionStore(accountId: "google:test-account", defaults: defaults)
 
         // Act
         store.setSelected("B", false, within: ["A", "B", "C"])
-        let relaunchedStore = UserDefaultsCalendarSelectionStore(defaults: defaults)
+        let relaunchedStore = UserDefaultsCalendarSelectionStore(accountId: "google:test-account", defaults: defaults)
 
         // Assert
         XCTAssertEqual(relaunchedStore.selectedCalendarIds, ["A", "C"])
+    }
+
+    func test_selectionsAreIsolatedPerAccount() {
+        // Arrange (RF-14: each Account's Calendar selection is independent)
+        let suiteName = "CalendarSelectionStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let storeA = UserDefaultsCalendarSelectionStore(accountId: "google:a", defaults: defaults)
+        let storeB = UserDefaultsCalendarSelectionStore(accountId: "google:b", defaults: defaults)
+
+        // Act
+        storeA.setSelected("Cal1", false, within: ["Cal1", "Cal2"])
+
+        // Assert
+        XCTAssertEqual(storeA.selectedCalendarIds, ["Cal2"])
+        XCTAssertNil(storeB.selectedCalendarIds)
+    }
+
+    func test_legacyUnscopedKeyIsStillReadable() {
+        // Arrange: a pre-multi-account install stored its selection under the bare,
+        // unscoped key — the migration path reads it directly via that literal key (TDR-005).
+        let suiteName = "CalendarSelectionStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(["A", "C"], forKey: UserDefaultsCalendarSelectionStore.legacyKey)
+
+        // Act
+        let stored = defaults.array(forKey: UserDefaultsCalendarSelectionStore.legacyKey) as? [String]
+
+        // Assert
+        XCTAssertEqual(Set(stored ?? []), ["A", "C"])
     }
 
     func test_staleStoredIdIsIntersectedOutByCaller() {

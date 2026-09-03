@@ -49,6 +49,13 @@ Scenario: One Account's network failure doesn't affect the other
   Then Account B's connection status is left unchanged
   And Account A's Triggers are still returned
 
+Scenario: A total outage during a full resync doesn't wipe the armed Triggers
+  Given Account A is connected with an armed Trigger
+  And every connected Account fails this Poll round
+  When refreshNow() (a full resync) runs
+  Then anyAccountSucceeded is false
+  And the Scheduler's armed set is left untouched
+
 Scenario: Adding a second Account registers it without disturbing the first
   Given Account A is already connected with a stored token and Calendar selection
   When addAccount(.google) resolves to a new Account B
@@ -112,7 +119,11 @@ and `connect(loginHint:)` (adds `prompt=select_account consent` and an optional
 `AuthManaging` now refines it. A new `AccountRegistry` (implementing `AccountsManaging`)
 owns one `AccountSession` (auth + calendar service pair, both built through an injected
 factory) per registered `Account`; it fans `poll(fullResync:)` out across sessions
-in sequence, isolating each session's error into its own `connectionStatus`, and
+in sequence, isolating each session's error into its own `connectionStatus`, and returns
+`(triggers: [Trigger], anyAccountSucceeded: Bool)` — the second element is what lets
+`AppCoordinator` skip `scheduler.cancelAll()` on a full resync when *every* Account failed
+this round (a total outage), instead of wiping every armed Trigger over what an empty
+`[Trigger]` alone couldn't distinguish from "nothing upcoming" (RNF-04). It also
 implements `addAccount`/`reconnect`/`signOut` using a provisional in-memory-token
 `AuthManager` to resolve identity before committing to the Keychain. `restore()` calls a
 `LegacyAccountMigration` helper first, which only acts when `AccountStore.accounts` is
@@ -161,13 +172,17 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
      func restore() async; func verifySessions() async; func addAccount(provider:
      AccountProvider) async throws -> Account; func reconnect(accountId: String) async
      throws; func signOut(accountId: String) async; func poll(fullResync: Bool) async ->
-     [Trigger] }`.
+     (triggers: [Trigger], anyAccountSucceeded: Bool) }`.
    - `final class AccountRegistry: AccountsManaging` (a `@MainActor` class, mirroring
-     `AppCoordinator`) constructed with an `AccountStoring`, a `KeychainStore`-legacy
-     accessor, and a `sessionFactory: (Account, TokenStoring) -> (AccountAuthenticating,
-     CalendarServicing)` closure — the real factory (wired in `AppDelegate`) builds a real
-     `AuthManager` + `GoogleCalendarAPI` + `CalendarService`(accountId:) triple; tests
-     inject fakes.
+     `AppCoordinator`) constructed with an `AccountStoring`, a `LegacyAccountMigrating`, a
+     `scopedTokenStore: (String) -> TokenStoring` and `scopedCalendarSelectionStore:
+     (String) -> CalendarSelectionStoring` (both testable without touching the real
+     Keychain/UserDefaults), a `provisionalAuthFactory: (TokenStoring) ->
+     AccountAuthenticating`, and a `sessionFactory: (Account, TokenStoring,
+     CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar:
+     CalendarServicing)` — the real factories (wired in `AppDelegate`) build real
+     `KeychainStore`/`UserDefaultsCalendarSelectionStore`/`AuthManager`/`GoogleCalendarAPI`/
+     `CalendarService`(accountId:) instances; tests inject fakes for all of them.
    - `addAccount(provider:)`: build a provisional `AuthManager` over an in-memory
      `TokenStoring`, call `connect(loginHint: nil)`, then `identity()`. If the resolved
      `Account.id` matches an existing session, replace that session's stored token and
@@ -183,11 +198,12 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
      accountScopedKey(id)).setRefreshToken(nil)`), remove it from `AccountStore` and
      `sessions`, and clear `selectedCalendarIds.<accountId>` from `UserDefaults`.
    - `poll(fullResync:)`: for each session, call its `CalendarServicing.poll(fullResync:)`;
-     on success, merge the Triggers and set `connectionStatus = .connected(email:
-     session.account.label)`; on `AuthError.refreshTokenRevoked`, set that session's
-     `connectionStatus = .needsReauth` and continue with the rest; on any other error, log
-     and leave `connectionStatus` as-is (RNF-04) and continue. Also refresh that session's
-     `calendars` via `availableCalendars()`.
+     on success, merge the Triggers, record that this session succeeded (folded into the
+     returned `anyAccountSucceeded`), and set `connectionStatus = .connected`; on
+     `AuthError.refreshTokenRevoked`, set that session's `connectionStatus = .needsReauth`
+     and continue with the rest; on any other error, log and leave `connectionStatus` as-is
+     (RNF-04) and continue. Also refresh that session's `calendars` via
+     `availableCalendars()`.
    - `verifySessions()`: for each session, call `identity()` (or a lighter authenticated
      probe) to move `.connecting` → `.connected`/`.needsReauth`, mirroring today's
      `AppCoordinator.verifySession()`.
@@ -216,10 +232,13 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
      `"N accounts · M need reconnecting"` (any `.needsReauth` present).
 10. **`App/AppCoordinator.swift`** — replace the `auth`/`calendar` properties with a
     single `accounts: AccountsManaging`. `start()`: `await accounts.restore()` → notify →
-    `Task { await accounts.verifySessions(); notify() }`. `poll(fullResync:)`: `let
-    triggers = await accounts.poll(fullResync:)`, then rebuild `state.accounts` from
-    `accounts.sessions` and `state.nextTrigger` from the Scheduler as today.
-    `logout()`/`reconnect()` take an `accountId: String` and call
+    `await accounts.verifySessions()` → notify → `await poll()`. `poll(fullResync:)`: `let
+    result = await accounts.poll(fullResync:)`; `scheduler.cancelAll()` only runs when
+    `fullResync && result.anyAccountSucceeded` (a total outage across every Account must
+    not wipe the armed set, RNF-04); then `scheduler.schedule(result.triggers)`, and
+    rebuild `state.accounts` from `accounts.sessions` and `state.nextTrigger` from the
+    Scheduler as today. `logout()`/`reconnect()` take an `accountId: String` — renamed
+    `signOut(accountId:)`/`reconnect(accountId:)` — and call
     `accounts.signOut(accountId:)`/`accounts.reconnect(accountId:)`; add `addAccount()`
     calling `accounts.addAccount(provider: .google)` then re-Polling (mirrors
     `calendarsChanged()`).
@@ -278,6 +297,7 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
 - [ ] Two connected Accounts both contribute Triggers, prefixed correctly (`AccountRegistryTests`)
 - [ ] A Calendar id shared by two Accounts produces two distinct Triggers (`AccountRegistryTests`)
 - [ ] A revoked/unreachable Account doesn't affect the other's Triggers or status (`AccountRegistryTests`)
+- [ ] A total outage across every Account during a full resync leaves the armed Triggers untouched (`AccountRegistryTests`, `AppCoordinatorTests`)
 - [ ] Adding an Account already connected updates it instead of duplicating it (`AccountRegistryTests`)
 - [ ] Reconnecting that resolves to a different identity registers that identity, not the old one (`AccountRegistryTests`)
 - [ ] Signing out one Account leaves the others' stored data untouched (`AccountRegistryTests`)

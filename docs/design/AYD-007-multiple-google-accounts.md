@@ -87,9 +87,13 @@ protocol AccountsManaging: AnyObject {
   func addAccount(provider: AccountProvider) async throws -> Account
   func reconnect(accountId: String) async throws
   func signOut(accountId: String) async
-  func poll(fullResync: Bool) async -> [Trigger]
+  func poll(fullResync: Bool) async -> (triggers: [Trigger], anyAccountSucceeded: Bool)
       // fan-out across sessions, merged; updates each session's connectionStatus/calendars
-      // in place as a side effect — a session's failure never drops another's Triggers
+      // in place as a side effect — a session's failure never drops another's Triggers.
+      // anyAccountSucceeded distinguishes "no Triggers because there's nothing upcoming"
+      // from "no Triggers because every Account failed this round" — the caller needs
+      // that to keep a full resync from wiping the Scheduler's armed set on a total
+      // outage (RNF-04); see "Key design decisions".
 }
 
 AccountSession {
@@ -219,7 +223,16 @@ sequenceDiagram
   network hiccup; only a token Google itself rejects (`refreshTokenRevoked`) is cleared.
 - **One Account's Poll failure doesn't touch the others** — `AccountRegistry.poll()` isolates
   errors per session, mirroring how `CalendarService.poll()` already isolates errors per Calendar
-  (AYD-002).
+  (AYD-002). A single Account failing during a full resync (RF-12) does lose *that* Account's
+  Triggers until its next successful Poll — an accepted trade-off, since it's the exact same
+  behavior a single failed Calendar within one Account already has today.
+- **`poll()` also reports whether *any* Account succeeded** — a full resync must not wipe the
+  Scheduler's armed set on a *total* outage (every Account failing at once, e.g. no network at
+  all) the way the previous, single-account build never called `cancelAll()` when its one Poll
+  call threw. Losing one Account's Triggers on a partial failure (above) is accepted; losing
+  *everyone's* Triggers because the whole request round happened to fail is not — `[Trigger]`
+  alone can't tell "nothing upcoming" apart from "everything failed", so `poll()` returns
+  `anyAccountSucceeded` alongside the merged Triggers for `AppCoordinator` to gate `cancelAll()` on.
 
 ## Out of scope / open questions
 - **Out:** non-Google Calendar sources (e.g. iCloud/EventKit); per-Account Flight Speed/Banner

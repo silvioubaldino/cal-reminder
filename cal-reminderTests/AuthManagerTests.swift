@@ -14,6 +14,7 @@ private final class FakeTokenStore: TokenStoring {
 
 private final class StubAuthorizationCodeProvider: AuthorizationCodeProviding {
     let code: String
+    private(set) var lastAuthorizationURL: URL?
 
     init(code: String = "auth-code-123") {
         self.code = code
@@ -23,7 +24,7 @@ private final class StubAuthorizationCodeProvider: AuthorizationCodeProviding {
         buildAuthorizationURL: @escaping (String) -> URL
     ) async throws -> (code: String, redirectURI: String) {
         let redirectURI = "http://127.0.0.1:12345/"
-        _ = buildAuthorizationURL(redirectURI)
+        lastAuthorizationURL = buildAuthorizationURL(redirectURI)
         return (code, redirectURI)
     }
 }
@@ -169,11 +170,11 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertEqual(String(data: data, encoding: .utf8), "success")
     }
 
-    func test_userEmail_returnsEmailFromUserInfoEndpoint() async throws {
-        // Arrange
+    func test_identity_decodesSubAndEmailFromUserInfoEndpoint() async throws {
+        // Arrange (RF-14/TDR-005: identity() resolves Google's immutable `sub`, not just email)
         let httpClient = StubHTTPClient(responses: [
             (tokenResponseData(accessToken: "access-1", expiresIn: 3600), httpResponse(status: 200)), // accessToken()
-            (try! JSONSerialization.data(withJSONObject: ["email": "user@example.com"]), httpResponse(status: 200)) // userinfo
+            (try! JSONSerialization.data(withJSONObject: ["sub": "1234567890", "email": "user@example.com"]), httpResponse(status: 200)) // userinfo
         ])
         let manager = AuthManager(
             config: config,
@@ -183,10 +184,58 @@ final class AuthManagerTests: XCTestCase {
         )
 
         // Act
-        let email = try await manager.userEmail()
+        let account = try await manager.identity()
 
         // Assert
-        XCTAssertEqual(email, "user@example.com")
+        XCTAssertEqual(account.id, "google:1234567890")
+        XCTAssertEqual(account.provider, .google)
+        XCTAssertEqual(account.label, "user@example.com")
+    }
+
+    func test_connect_defaultAuthorizationURLOffersAnAccountChooserWithNoHint() async throws {
+        // Arrange (RF-14: without select_account, Google reuses the browser session and
+        // never offers a chooser — impossible to add a *second* Account)
+        let httpClient = StubHTTPClient(responses: [
+            (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
+        ])
+        let authProvider = StubAuthorizationCodeProvider()
+        let manager = AuthManager(
+            config: config,
+            tokenStore: FakeTokenStore(),
+            httpClient: httpClient,
+            authorizationCodeProvider: authProvider
+        )
+
+        // Act
+        try await manager.connect()
+
+        // Assert
+        let url = try XCTUnwrap(authProvider.lastAuthorizationURL)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertEqual(query.first { $0.name == "prompt" }?.value, "select_account consent")
+        XCTAssertNil(query.first { $0.name == "login_hint" })
+    }
+
+    func test_connectLoginHint_addsLoginHintToTheAuthorizationURL() async throws {
+        // Arrange (RF-14: "Reconnect" on a specific Account pre-selects it)
+        let httpClient = StubHTTPClient(responses: [
+            (tokenResponseData(accessToken: "access-1", refreshToken: "refresh-1"), httpResponse(status: 200))
+        ])
+        let authProvider = StubAuthorizationCodeProvider()
+        let manager = AuthManager(
+            config: config,
+            tokenStore: FakeTokenStore(),
+            httpClient: httpClient,
+            authorizationCodeProvider: authProvider
+        )
+
+        // Act
+        try await manager.connect(loginHint: "user@example.com")
+
+        // Assert
+        let url = try XCTUnwrap(authProvider.lastAuthorizationURL)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertEqual(query.first { $0.name == "login_hint" }?.value, "user@example.com")
     }
 
     func test_connect_tokenExchangeCarriesClientCredentialsAndPKCE() async throws {

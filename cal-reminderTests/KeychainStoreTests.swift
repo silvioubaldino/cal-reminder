@@ -51,4 +51,32 @@ final class KeychainStoreTests: XCTestCase {
         // Assert
         XCTAssertNil(store.refreshToken())
     }
+
+    func test_twoAccountsUnderTheSameServiceDontSeeEachOthersToken() {
+        // Arrange (RF-14/TDR-005: each connected Account gets its own Keychain entry)
+        let service = "com.cal-reminder.auth.tests.\(UUID().uuidString)"
+        let storeA = KeychainStore(service: service, account: KeychainStore.accountScopedKey("google:a"))
+        let storeB = KeychainStore(service: service, account: KeychainStore.accountScopedKey("google:b"))
+
+        // Act
+        storeA.setRefreshToken("token-a")
+
+        // Assert
+        XCTAssertEqual(storeA.refreshToken(), "token-a")
+        XCTAssertNil(storeB.refreshToken())
+    }
+
+    func test_defaultAccountStillReadsTheLegacyUnscopedEntry() {
+        // Arrange: the single-account build wrote under the default (legacy) account name —
+        // the default init parameter must keep reading/writing that same entry (TDR-005).
+        let service = "com.cal-reminder.auth.tests.\(UUID().uuidString)"
+        let legacyStore = KeychainStore(service: service)
+
+        // Act
+        legacyStore.setRefreshToken("legacy-token")
+        let reopened = KeychainStore(service: service, account: KeychainStore.legacyAccount)
+
+        // Assert
+        XCTAssertEqual(reopened.refreshToken(), "legacy-token")
+    }
 }

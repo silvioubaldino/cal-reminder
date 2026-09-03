@@ -8,9 +8,9 @@ private final class FakeAuthManaging: AuthManaging {
     var response: (Data, HTTPURLResponse) = (Data(), httpResponse(status: 200))
     private(set) var lastRequest: URLRequest?
 
-    func connect() async throws {}
+    func connect(loginHint: String?) async throws {}
     func accessToken() async throws -> String { "access-token" }
-    func userEmail() async throws -> String { "user@example.com" }
+    func identity() async throws -> Account { Account(id: "google:test", provider: .google, label: "user@example.com") }
     func disconnect() async {}
 
     func authorizedRequest(_ makeRequest: (String) -> URLRequest) async throws -> (Data, HTTPURLResponse) {

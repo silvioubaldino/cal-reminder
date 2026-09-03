@@ -25,6 +25,10 @@ final class CalendarService: CalendarServicing {
     private static let pollWindow: TimeInterval = 2 * 60 * 60
 
     private let api: GoogleCalendarAPIProtocol
+    /// The connected Account this service polls on behalf of — prefixed onto every
+    /// Trigger's dedupe id (RN-03), so a Calendar id shared between two Accounts can never
+    /// collide (AYD-007).
+    private let accountId: String
     private let selectionStore: CalendarSelectionStoring
     private let clock: () -> Date
 
@@ -33,10 +37,12 @@ final class CalendarService: CalendarServicing {
 
     init(
         api: GoogleCalendarAPIProtocol,
-        selectionStore: CalendarSelectionStoring = UserDefaultsCalendarSelectionStore(),
+        accountId: String,
+        selectionStore: CalendarSelectionStoring,
         clock: @escaping () -> Date = Date.init
     ) {
         self.api = api
+        self.accountId = accountId
         self.selectionStore = selectionStore
         self.clock = clock
     }
@@ -120,7 +126,7 @@ final class CalendarService: CalendarServicing {
             print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
             return minutesList.map { minutes in
                 Trigger(
-                    id: "\(calendarId)#\(event.id)#\(minutes)",
+                    id: "\(accountId)#\(calendarId)#\(event.id)#\(minutes)",
                     eventTitle: event.summary ?? "",
                     startDate: startDate,
                     fireDate: startDate.addingTimeInterval(-Double(minutes) * 60),
