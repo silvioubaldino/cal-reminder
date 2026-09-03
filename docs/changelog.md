@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-016: the menu bar now has an "Accounts" submenu — one entry per connected Google Account, each with its own Calendars, Reconnect, and Sign out, plus "Add Google account…" to connect another one; an Account needing reconnection is marked in the menu.
 - Implemented SPEC-015: the app now supports connecting more than one Google Account at once under the hood — each with its own Keychain-stored token and Calendar selection, polled independently so one Account's failure never affects the others; the existing single connected Account migrates over automatically. The menu bar still shows a single Account for now (SPEC-016 adds the "Accounts" menu).
 - Wrote SPEC-015 and SPEC-016: implementation plan for connecting more than one Google Account at the same time, each with its own Calendars selection and an "Accounts" menu.
 - Designed AYD-007: connecting more than one Google Account at the same time, each with its own Calendar selection; superseded AYD-002 (single-account Calendar selection) and added RF-14, the Account glossary term, and a technical decision on account identity and storage scoping (TDR-005).

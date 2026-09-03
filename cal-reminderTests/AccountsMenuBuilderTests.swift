@@ -1,0 +1,137 @@
+import XCTest
+@testable import cal_reminder
+
+private final class FakeCalendarSelectionStore: CalendarSelectionStoring {
+    var selectedCalendarIds: Set<String>?
+}
+
+final class AccountsMenuBuilderTests: XCTestCase {
+    private func accountState(
+        id: String,
+        label: String,
+        status: ConnectionStatus,
+        calendars: [CalendarInfo] = []
+    ) -> AccountState {
+        AccountState(id: id, label: label, connectionStatus: status, calendars: calendars)
+    }
+
+    private func accountsMenu(for accounts: [AccountState]) -> NSMenu {
+        AccountsMenuBuilder.accountsMenu(
+            for: accounts,
+            selectionStore: { _ in FakeCalendarSelectionStore() },
+            onCalendarsChanged: {},
+            onReconnect: { _ in },
+            onSignOut: { _ in },
+            onAddAccount: {}
+        )
+    }
+
+    func test_noAccountsRendersOnlyAddAccount() {
+        // Arrange / Act
+        let menu = accountsMenu(for: [])
+
+        // Assert
+        XCTAssertEqual(menu.items.count, 1)
+        XCTAssertEqual(menu.items.first?.title, "Add Google account…")
+    }
+
+    func test_rowCountMatchesAccountsPlusSeparatorPlusAddAccount() {
+        // Arrange
+        let accounts = [
+            accountState(id: "google:a", label: "a@example.com", status: .connected),
+            accountState(id: "google:b", label: "b@example.com", status: .connected)
+        ]
+
+        // Act
+        let menu = accountsMenu(for: accounts)
+
+        // Assert
+        XCTAssertEqual(menu.items.count, 4)
+        XCTAssertEqual(menu.items[0].title, "a@example.com")
+        XCTAssertEqual(menu.items[1].title, "b@example.com")
+        XCTAssertTrue(menu.items[2].isSeparatorItem)
+        XCTAssertEqual(menu.items[3].title, "Add Google account…")
+    }
+
+    func test_needsReauthAccountTitleCarriesAWarningMarker() throws {
+        // Arrange
+        let accounts = [accountState(id: "google:a", label: "a@example.com", status: .needsReauth)]
+
+        // Act
+        let menu = accountsMenu(for: accounts)
+
+        // Assert
+        let title = try XCTUnwrap(menu.items.first?.title)
+        XCTAssertTrue(title.contains("a@example.com"))
+        XCTAssertTrue(title.contains("⚠︎"))
+    }
+
+    func test_connectedAccountTitleHasNoWarningMarker() {
+        // Arrange
+        let accounts = [accountState(id: "google:a", label: "a@example.com", status: .connected)]
+
+        // Act
+        let menu = accountsMenu(for: accounts)
+
+        // Assert
+        XCTAssertEqual(menu.items.first?.title, "a@example.com")
+    }
+
+    func test_accountSubmenuContainsCalendarsSeparatorReconnectAndSignOut() throws {
+        // Arrange
+        let accounts = [accountState(id: "google:a", label: "a@example.com", status: .connected)]
+
+        // Act
+        let menu = accountsMenu(for: accounts)
+        let accountSubmenu = try XCTUnwrap(menu.items.first?.submenu)
+
+        // Assert
+        XCTAssertEqual(accountSubmenu.items.count, 4)
+        XCTAssertEqual(accountSubmenu.items[0].title, "Calendars")
+        XCTAssertTrue(accountSubmenu.items[1].isSeparatorItem)
+        XCTAssertEqual(accountSubmenu.items[2].title, "Reconnect")
+        XCTAssertEqual(accountSubmenu.items[3].title, "Sign out")
+    }
+
+    func test_calendarsSubmenuShowsPlaceholderWhenEmpty() {
+        // Arrange
+        let account = accountState(id: "google:a", label: "a@example.com", status: .connected, calendars: [])
+
+        // Act
+        let submenu = AccountsMenuBuilder.calendarsSubmenu(
+            for: account,
+            selectionStore: FakeCalendarSelectionStore(),
+            onCalendarsChanged: {}
+        )
+
+        // Assert
+        XCTAssertEqual(submenu.items.count, 1)
+        XCTAssertEqual(submenu.items.first?.title, "No Calendars yet")
+        XCTAssertFalse(submenu.items.first?.isEnabled ?? true)
+    }
+
+    func test_calendarsSubmenuHasOneRowPerCalendar() {
+        // Arrange
+        let account = accountState(
+            id: "google:a",
+            label: "a@example.com",
+            status: .connected,
+            calendars: [
+                CalendarInfo(id: "cal1", title: "Cal 1", isPrimary: true),
+                CalendarInfo(id: "cal2", title: "Cal 2", isPrimary: false)
+            ]
+        )
+
+        // Act
+        let submenu = AccountsMenuBuilder.calendarsSubmenu(
+            for: account,
+            selectionStore: FakeCalendarSelectionStore(),
+            onCalendarsChanged: {}
+        )
+
+        // Assert
+        XCTAssertEqual(submenu.items.count, 2)
+        XCTAssertNotNil(submenu.items[0].view)
+        XCTAssertNotNil(submenu.items[1].view)
+    }
+}

@@ -115,8 +115,8 @@ today) and a new `onAddAccount`.
 3. **`App/AppDelegate.swift`** — pass a `calendarSelectionStore` factory
    (`{ UserDefaultsCalendarSelectionStore(accountId: $0) }`), and wire
    `onReconnect`/`onSignOut` to `coordinator?.reconnect(accountId:)` /
-   `coordinator?.logout(accountId:)` (renamed from SPEC-015's `logout()`/`reconnect()`
-   per-Account signatures), and `onAddAccount` to `coordinator?.addAccount()`.
+   `coordinator?.signOut(accountId:)` (SPEC-015's per-Account signatures), and
+   `onAddAccount` to `coordinator?.addAccount()`.
 
 ## Affected files
 - `cal-reminder/MenuBar/AccountsMenuBuilder.swift` *(new)*

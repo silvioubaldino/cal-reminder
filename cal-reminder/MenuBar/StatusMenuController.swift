@@ -1,55 +1,17 @@
 import Cocoa
 
-/// A checkbox row for the "Calendars" submenu (RF-10). Uses a custom `NSMenuItem.view`
-/// instead of a plain item + action: `NSMenu` only auto-dismisses when a *menu item*
-/// sends its action, and a custom view's button click is handled entirely within the
-/// button's own tracking loop — so the menu stays open across multiple toggles.
-private final class CalendarCheckboxView: NSView {
-    private let checkbox: NSButton
-    private let onToggle: (Bool) -> Void
-
-    init(title: String, isChecked: Bool, onToggle: @escaping (Bool) -> Void) {
-        self.onToggle = onToggle
-        checkbox = NSButton(checkboxWithTitle: title, target: nil, action: nil)
-        checkbox.state = isChecked ? .on : .off
-        checkbox.sizeToFit()
-
-        // Frame-based, not Auto Layout: NSMenu reads `view.frame.size` directly to size
-        // the row — it never triggers a constraint-based layout pass for custom item views.
-        let horizontalPadding: CGFloat = 18
-        let verticalPadding: CGFloat = 2
-        let size = NSSize(
-            width: checkbox.frame.width + horizontalPadding + 14,
-            height: checkbox.frame.height + verticalPadding * 2
-        )
-        super.init(frame: NSRect(origin: .zero, size: size))
-
-        checkbox.frame.origin = NSPoint(x: horizontalPadding, y: verticalPadding)
-        addSubview(checkbox)
-        checkbox.target = self
-        checkbox.action = #selector(handleToggle)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    @objc private func handleToggle() {
-        onToggle(checkbox.state == .on)
-    }
-}
-
 /// The `NSStatusItem` menu (RF-06): connection status, next upcoming Trigger, Pause/Resume,
-/// test animation, Flight Speed, Reconnect Google, and Quit. `render(_:)` reflects the
-/// `AppCoordinator`'s `AppState` after every change.
+/// test animation, Flight Speed, Banner color, the per-Account "Accounts" submenu (RF-14),
+/// and Quit. `render(_:)` reflects the `AppCoordinator`'s `AppState` after every change.
 final class StatusMenuController {
     private let statusItem: NSStatusItem
     private let onTestAnimation: () -> Void
     private let onToggleEnabled: () -> Void
-    private let onReconnect: () -> Void
-    private let onSignOut: () -> Void
+    private let onReconnect: (String) -> Void
+    private let onSignOut: (String) -> Void
     private let onRefresh: () -> Void
     private let onCalendarsChanged: () -> Void
+    private let onAddAccount: () -> Void
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
     private let matchCalendarColorStore: MatchCalendarColorStoring
@@ -60,12 +22,8 @@ final class StatusMenuController {
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
     private var matchCalendarColorItem: NSMenuItem!
-    private var calendarsMenuItem: NSMenuItem!
-    private var signOutItem: NSMenuItem!
+    private var accountsMenuItem: NSMenuItem!
     private var skipOnClickItem: NSMenuItem!
-    private var calendars: [CalendarInfo] = []
-    /// The single Account this interim (pre-SPEC-016) flat "Calendars" submenu operates on.
-    private var currentAccountId: String?
 
     private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
     private let nextTriggerLabel = NSMenuItem(title: "No upcoming reminders", action: nil, keyEquivalent: "")
@@ -75,10 +33,11 @@ final class StatusMenuController {
     init(
         onTestAnimation: @escaping () -> Void,
         onToggleEnabled: @escaping () -> Void = {},
-        onReconnect: @escaping () -> Void = {},
-        onSignOut: @escaping () -> Void = {},
+        onReconnect: @escaping (String) -> Void = { _ in },
+        onSignOut: @escaping (String) -> Void = { _ in },
         onRefresh: @escaping () -> Void = {},
         onCalendarsChanged: @escaping () -> Void = {},
+        onAddAccount: @escaping () -> Void = {},
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
         colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
         matchCalendarColorStore: MatchCalendarColorStoring = UserDefaultsMatchCalendarColorStore(),
@@ -91,6 +50,7 @@ final class StatusMenuController {
         self.onSignOut = onSignOut
         self.onRefresh = onRefresh
         self.onCalendarsChanged = onCalendarsChanged
+        self.onAddAccount = onAddAccount
         self.speedStore = speedStore
         self.colorStore = colorStore
         self.matchCalendarColorStore = matchCalendarColorStore
@@ -105,12 +65,9 @@ final class StatusMenuController {
     }
 
     /// Reflects the coordinator's `AppState` in the menu (RF-06 status + next Trigger +
-    /// RF-10 Calendars submenu).
+    /// RF-14 Accounts submenu).
     func render(_ state: AppState) {
         statusLabel.title = state.statusTitle
-        // Interim (pre-SPEC-016): a single flat "Calendars"/sign-out pair, bound to the
-        // first connected Account. SPEC-016 replaces this with a per-Account "Accounts" submenu.
-        signOutItem.isHidden = state.accounts.isEmpty
 
         toggleItem.title = state.enabled ? "Pause" : "Resume"
 
@@ -128,9 +85,14 @@ final class StatusMenuController {
         refreshItem.title = state.refreshing ? "Refreshing…" : "Refresh now"
         refreshItem.isEnabled = !state.refreshing
 
-        currentAccountId = state.accounts.first?.id
-        calendars = state.accounts.first?.calendars ?? []
-        rebuildCalendarsSubmenu()
+        accountsMenuItem.submenu = AccountsMenuBuilder.accountsMenu(
+            for: state.accounts,
+            selectionStore: calendarSelectionStore,
+            onCalendarsChanged: onCalendarsChanged,
+            onReconnect: onReconnect,
+            onSignOut: onSignOut,
+            onAddAccount: onAddAccount
+        )
     }
 
     private func buildMenu() {
@@ -164,26 +126,9 @@ final class StatusMenuController {
         menu.addItem(bannerColorMenuItem())
         menu.addItem(skipOnClickMenuItem())
 
-        calendarsMenuItem = NSMenuItem(title: "Calendars", action: nil, keyEquivalent: "")
-        calendarsMenuItem.submenu = NSMenu()
-        menu.addItem(calendarsMenuItem)
-
-        let reconnectItem = NSMenuItem(
-            title: "Reconnect Google",
-            action: #selector(handleReconnect),
-            keyEquivalent: ""
-        )
-        reconnectItem.target = self
-        menu.addItem(reconnectItem)
-
-        signOutItem = NSMenuItem(
-            title: "Sign out of Google",
-            action: #selector(handleSignOut),
-            keyEquivalent: ""
-        )
-        signOutItem.target = self
-        signOutItem.isHidden = true
-        menu.addItem(signOutItem)
+        accountsMenuItem = NSMenuItem(title: "Accounts", action: nil, keyEquivalent: "")
+        accountsMenuItem.submenu = NSMenu()
+        menu.addItem(accountsMenuItem)
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
@@ -268,48 +213,12 @@ final class StatusMenuController {
         return item
     }
 
-    /// Rebuilds the "Calendars" submenu (RF-10) from `calendars`, one checkbox each,
-    /// checked when effectively selected. Called from `render(_:)` so it always reflects
-    /// the latest Poll.
-    private func rebuildCalendarsSubmenu() {
-        let submenu = NSMenu()
-        let allIds = Set(calendars.map(\.id))
-
-        if calendars.isEmpty || currentAccountId == nil {
-            let placeholder = NSMenuItem(title: "No Calendars yet", action: nil, keyEquivalent: "")
-            placeholder.isEnabled = false
-            submenu.addItem(placeholder)
-        } else if let accountId = currentAccountId {
-            let selectionStore = calendarSelectionStore(accountId)
-            for calendar in calendars {
-                let isChecked = selectionStore.isSelected(calendar.id, within: allIds)
-                let item = NSMenuItem()
-                item.view = CalendarCheckboxView(title: calendar.title, isChecked: isChecked) { [weak self] isOn in
-                    guard let self else { return }
-                    selectionStore.setSelected(calendar.id, isOn, within: allIds)
-                    onCalendarsChanged()
-                }
-                submenu.addItem(item)
-            }
-        }
-
-        calendarsMenuItem.submenu = submenu
-    }
-
     @objc private func handleTestAnimation() {
         onTestAnimation()
     }
 
     @objc private func handleToggleEnabled() {
         onToggleEnabled()
-    }
-
-    @objc private func handleReconnect() {
-        onReconnect()
-    }
-
-    @objc private func handleSignOut() {
-        onSignOut()
     }
 
     @objc private func handleRefresh() {

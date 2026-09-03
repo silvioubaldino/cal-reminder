@@ -31,12 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onToggleEnabled: { [weak coordinator] in
                 coordinator?.toggleEnabled()
             },
-            onReconnect: { [weak coordinator] in
-                guard let accountId = coordinator?.state.accounts.first?.id else { return }
+            onReconnect: { [weak coordinator] accountId in
                 coordinator?.reconnect(accountId: accountId)
             },
-            onSignOut: { [weak coordinator] in
-                guard let accountId = coordinator?.state.accounts.first?.id else { return }
+            onSignOut: { [weak coordinator] accountId in
                 coordinator?.signOut(accountId: accountId)
             },
             onRefresh: { [weak coordinator] in
@@ -44,6 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onCalendarsChanged: { [weak coordinator] in
                 coordinator?.calendarsChanged()
+            },
+            onAddAccount: { [weak coordinator] in
+                coordinator?.addAccount()
             },
             speedStore: flightSpeedStore,
             calendarSelectionStore: { UserDefaultsCalendarSelectionStore(accountId: $0) },
