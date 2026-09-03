@@ -55,6 +55,15 @@ private final class MenuItemAction: NSObject {
     }
 }
 
+/// The Accounts submenu's callbacks, bundled to keep `accountsMenu(for:...)`'s parameter
+/// count within SwiftLint's `function_parameter_count` limit.
+struct AccountsMenuActions {
+    let onCalendarsChanged: () -> Void
+    let onReconnect: (String) -> Void
+    let onSignOut: (String) -> Void
+    let onAddAccount: () -> Void
+}
+
 /// Builds the "Accounts" submenu (RF-14): one submenu per connected Account — its Calendars,
 /// Reconnect, and Sign out — followed by "Add Google account…". A pure builder (no stored
 /// state) so it can be exercised headlessly in tests.
@@ -92,27 +101,18 @@ enum AccountsMenuBuilder {
     static func accountsMenu(
         for accounts: [AccountState],
         selectionStore: (String) -> CalendarSelectionStoring,
-        onCalendarsChanged: @escaping () -> Void,
-        onReconnect: @escaping (String) -> Void,
-        onSignOut: @escaping (String) -> Void,
-        onAddAccount: @escaping () -> Void
+        actions: AccountsMenuActions
     ) -> NSMenu {
         let menu = NSMenu()
 
         for account in accounts {
-            menu.addItem(accountMenuItem(
-                for: account,
-                selectionStore: selectionStore(account.id),
-                onCalendarsChanged: onCalendarsChanged,
-                onReconnect: onReconnect,
-                onSignOut: onSignOut
-            ))
+            menu.addItem(accountMenuItem(for: account, selectionStore: selectionStore(account.id), actions: actions))
         }
 
         if !accounts.isEmpty {
             menu.addItem(.separator())
         }
-        menu.addItem(addAccountMenuItem(onAddAccount: onAddAccount))
+        menu.addItem(actionItem(title: "Add Google account…", action: actions.onAddAccount))
 
         return menu
     }
@@ -120,9 +120,7 @@ enum AccountsMenuBuilder {
     private static func accountMenuItem(
         for account: AccountState,
         selectionStore: CalendarSelectionStoring,
-        onCalendarsChanged: @escaping () -> Void,
-        onReconnect: @escaping (String) -> Void,
-        onSignOut: @escaping (String) -> Void
+        actions: AccountsMenuActions
     ) -> NSMenuItem {
         let accountItem = NSMenuItem()
         accountItem.title = account.connectionStatus == .needsReauth ? "⚠︎ \(account.label) — reconnect needed" : account.label
@@ -130,20 +128,16 @@ enum AccountsMenuBuilder {
         let submenu = NSMenu()
 
         let calendarsItem = NSMenuItem(title: "Calendars", action: nil, keyEquivalent: "")
-        calendarsItem.submenu = calendarsSubmenu(for: account, selectionStore: selectionStore, onCalendarsChanged: onCalendarsChanged)
+        calendarsItem.submenu = calendarsSubmenu(for: account, selectionStore: selectionStore, onCalendarsChanged: actions.onCalendarsChanged)
         submenu.addItem(calendarsItem)
 
         submenu.addItem(.separator())
 
-        submenu.addItem(actionItem(title: "Reconnect") { onReconnect(account.id) })
-        submenu.addItem(actionItem(title: "Sign out") { onSignOut(account.id) })
+        submenu.addItem(actionItem(title: "Reconnect") { actions.onReconnect(account.id) })
+        submenu.addItem(actionItem(title: "Sign out") { actions.onSignOut(account.id) })
 
         accountItem.submenu = submenu
         return accountItem
-    }
-
-    private static func addAccountMenuItem(onAddAccount: @escaping () -> Void) -> NSMenuItem {
-        actionItem(title: "Add Google account…", action: onAddAccount)
     }
 
     private static func actionItem(title: String, action: @escaping () -> Void) -> NSMenuItem {

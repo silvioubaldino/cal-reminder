@@ -118,9 +118,7 @@ private final class AccountRegistryHarness {
     }
 
     func makeRegistry() -> AccountRegistry {
-        AccountRegistry(
-            accountStore: accountStore,
-            legacyMigration: legacyMigration,
+        let factories = AccountSessionFactories(
             scopedTokenStore: { [self] in tokenStore(for: $0) },
             scopedCalendarSelectionStore: { [self] in selectionStore(for: $0) },
             provisionalAuthFactory: { [self] tokenStore in
@@ -130,6 +128,7 @@ private final class AccountRegistryHarness {
             },
             sessionFactory: { [self] account, _, _ in (authService(for: account), calendarService(for: account.id)) }
         )
+        return AccountRegistry(accountStore: accountStore, legacyMigration: legacyMigration, factories: factories)
     }
 }
 

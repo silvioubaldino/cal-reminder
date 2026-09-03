@@ -94,13 +94,16 @@ today) and a new `onAddAccount`.
    `func calendarsSubmenu(for account: AccountState, selectionStore:
    CalendarSelectionStoring, onCalendarsChanged: @escaping () -> Void) -> NSMenu`, reusing
    the existing `CalendarCheckboxView`. Adds `func accountsMenu(for accounts:
-   [AccountState], selectionStore: (String) -> CalendarSelectionStoring, onCalendarsChanged:
-   @escaping () -> Void, onReconnect: @escaping (String) -> Void, onSignOut: @escaping
-   (String) -> Void, onAddAccount: @escaping () -> Void) -> NSMenu`: for each `AccountState`,
-   a submenu titled with the Account's `label` (prefixed `⚠︎ ` when
-   `connectionStatus == .needsReauth`) containing `calendarsSubmenu(...)`, a separator,
-   "Reconnect", and "Sign out"; below all Account rows, a separator and "Add Google
-   account…". Empty `accounts` renders just "Add Google account…".
+   [AccountState], selectionStore: (String) -> CalendarSelectionStoring, actions:
+   AccountsMenuActions) -> NSMenu`: for each `AccountState`, a submenu titled with the
+   Account's `label` (prefixed `⚠︎ ` when `connectionStatus == .needsReauth`) containing
+   `calendarsSubmenu(...)`, a separator, "Reconnect", and "Sign out"; below all Account
+   rows, a separator and "Add Google account…". Empty `accounts` renders just "Add Google
+   account…". The four callbacks (`onCalendarsChanged`/`onReconnect`/`onSignOut`/
+   `onAddAccount`) are bundled into a small `AccountsMenuActions` struct rather than passed
+   individually — `accountsMenu` would otherwise take 6 parameters, past SwiftLint's
+   `function_parameter_count` limit (discovered by CI, not anticipated in this SPEC's
+   original draft).
 2. **`MenuBar/StatusMenuController.swift`**:
    - Remove `calendarsMenuItem`, `signOutItem`, the top-level "Reconnect Google" /
      "Sign out of Google" items, and `rebuildCalendarsSubmenu()`.

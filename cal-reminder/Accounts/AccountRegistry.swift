@@ -42,6 +42,21 @@ protocol AccountsManaging: AnyObject {
     func poll(fullResync: Bool) async -> (triggers: [Trigger], anyAccountSucceeded: Bool)
 }
 
+/// The per-Account factories `AccountRegistry` needs, bundled to keep its initializer's
+/// parameter count within SwiftLint's `function_parameter_count` limit.
+struct AccountSessionFactories {
+    /// Builds the real, Account-scoped Keychain-backed token store for an Account id.
+    let scopedTokenStore: (String) -> TokenStoring
+    /// Builds the real, Account-scoped Calendar-selection store for an Account id.
+    let scopedCalendarSelectionStore: (String) -> CalendarSelectionStoring
+    /// Builds a provisional `AccountAuthenticating` over an in-memory token store, used to
+    /// resolve identity before committing anything to the Keychain (`addAccount`/`reconnect`).
+    let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating
+    /// Builds the live `auth`/`calendar` pair for an Account on top of its already-scoped
+    /// token + Calendar-selection stores.
+    let sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing)
+}
+
 /// Not actor-isolated, like `CalendarService` — safe because `AppCoordinator` (its only
 /// caller) is itself `@MainActor` and never calls into this concurrently.
 final class AccountRegistry: AccountsManaging {
@@ -52,12 +67,7 @@ final class AccountRegistry: AccountsManaging {
 
     private let accountStore: AccountStoring
     private let legacyMigration: LegacyAccountMigrating
-    private let scopedTokenStore: (String) -> TokenStoring
-    private let scopedCalendarSelectionStore: (String) -> CalendarSelectionStoring
-    private let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating
-    /// Builds the live `auth`/`calendar` pair for an Account on top of its already-scoped
-    /// token + Calendar-selection stores.
-    private let sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing)
+    private let factories: AccountSessionFactories
 
     private var accounts: [Account] = []
     private var live: [String: Live] = [:]
@@ -74,20 +84,10 @@ final class AccountRegistry: AccountsManaging {
         }
     }
 
-    init(
-        accountStore: AccountStoring,
-        legacyMigration: LegacyAccountMigrating,
-        scopedTokenStore: @escaping (String) -> TokenStoring,
-        scopedCalendarSelectionStore: @escaping (String) -> CalendarSelectionStoring,
-        provisionalAuthFactory: @escaping (TokenStoring) -> AccountAuthenticating,
-        sessionFactory: @escaping (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing)
-    ) {
+    init(accountStore: AccountStoring, legacyMigration: LegacyAccountMigrating, factories: AccountSessionFactories) {
         self.accountStore = accountStore
         self.legacyMigration = legacyMigration
-        self.scopedTokenStore = scopedTokenStore
-        self.scopedCalendarSelectionStore = scopedCalendarSelectionStore
-        self.provisionalAuthFactory = provisionalAuthFactory
-        self.sessionFactory = sessionFactory
+        self.factories = factories
     }
 
     func restore() async {
@@ -125,8 +125,8 @@ final class AccountRegistry: AccountsManaging {
     }
 
     func signOut(accountId: String) async {
-        scopedTokenStore(accountId).setRefreshToken(nil)
-        scopedCalendarSelectionStore(accountId).selectedCalendarIds = nil
+        factories.scopedTokenStore(accountId).setRefreshToken(nil)
+        factories.scopedCalendarSelectionStore(accountId).selectedCalendarIds = nil
         accounts.removeAll { $0.id == accountId }
         live.removeValue(forKey: accountId)
         statuses.removeValue(forKey: accountId)
@@ -163,11 +163,11 @@ final class AccountRegistry: AccountsManaging {
     /// duplicating it (AYD-007 "add Account" / "reconnect" flow).
     private func connectAndCommit(loginHint: String?) async throws -> Account {
         let provisionalToken = InMemoryTokenStore()
-        let provisionalAuth = provisionalAuthFactory(provisionalToken)
+        let provisionalAuth = factories.provisionalAuthFactory(provisionalToken)
         try await provisionalAuth.connect(loginHint: loginHint)
         let account = try await provisionalAuth.identity()
 
-        scopedTokenStore(account.id).setRefreshToken(provisionalToken.refreshToken())
+        factories.scopedTokenStore(account.id).setRefreshToken(provisionalToken.refreshToken())
 
         if let index = accounts.firstIndex(where: { $0.id == account.id }) {
             accounts[index] = account
@@ -182,7 +182,7 @@ final class AccountRegistry: AccountsManaging {
     }
 
     private func buildLive(for account: Account) -> Live {
-        let (auth, calendar) = sessionFactory(account, scopedTokenStore(account.id), scopedCalendarSelectionStore(account.id))
+        let (auth, calendar) = factories.sessionFactory(account, factories.scopedTokenStore(account.id), factories.scopedCalendarSelectionStore(account.id))
         return Live(auth: auth, calendar: calendar)
     }
 }

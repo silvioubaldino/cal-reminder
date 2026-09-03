@@ -88,10 +88,12 @@ final class StatusMenuController {
         accountsMenuItem.submenu = AccountsMenuBuilder.accountsMenu(
             for: state.accounts,
             selectionStore: calendarSelectionStore,
-            onCalendarsChanged: onCalendarsChanged,
-            onReconnect: onReconnect,
-            onSignOut: onSignOut,
-            onAddAccount: onAddAccount
+            actions: AccountsMenuActions(
+                onCalendarsChanged: onCalendarsChanged,
+                onReconnect: onReconnect,
+                onSignOut: onSignOut,
+                onAddAccount: onAddAccount
+            )
         )
     }
 

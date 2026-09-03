@@ -88,13 +88,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return (auth, calendar)
         }
 
-        return AccountRegistry(
-            accountStore: UserDefaultsAccountStore(),
-            legacyMigration: LegacyAccountMigration(provisionalAuthFactory: provisionalAuthFactory),
+        let factories = AccountSessionFactories(
             scopedTokenStore: scopedTokenStore,
             scopedCalendarSelectionStore: scopedCalendarSelectionStore,
             provisionalAuthFactory: provisionalAuthFactory,
             sessionFactory: sessionFactory
+        )
+
+        return AccountRegistry(
+            accountStore: UserDefaultsAccountStore(),
+            legacyMigration: LegacyAccountMigration(provisionalAuthFactory: provisionalAuthFactory),
+            factories: factories
         )
     }
 }

@@ -173,16 +173,20 @@ today's flat "Calendars" item; SPEC-016 replaces that with the real "Accounts" s
      AccountProvider) async throws -> Account; func reconnect(accountId: String) async
      throws; func signOut(accountId: String) async; func poll(fullResync: Bool) async ->
      (triggers: [Trigger], anyAccountSucceeded: Bool) }`.
-   - `final class AccountRegistry: AccountsManaging` (a `@MainActor` class, mirroring
-     `AppCoordinator`) constructed with an `AccountStoring`, a `LegacyAccountMigrating`, a
-     `scopedTokenStore: (String) -> TokenStoring` and `scopedCalendarSelectionStore:
-     (String) -> CalendarSelectionStoring` (both testable without touching the real
-     Keychain/UserDefaults), a `provisionalAuthFactory: (TokenStoring) ->
-     AccountAuthenticating`, and a `sessionFactory: (Account, TokenStoring,
-     CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar:
-     CalendarServicing)` — the real factories (wired in `AppDelegate`) build real
-     `KeychainStore`/`UserDefaultsCalendarSelectionStore`/`AuthManager`/`GoogleCalendarAPI`/
-     `CalendarService`(accountId:) instances; tests inject fakes for all of them.
+   - `final class AccountRegistry: AccountsManaging` — **not** actor-isolated, like
+     `CalendarService`: safe because `AppCoordinator` (its only caller) is `@MainActor` and
+     never calls into it concurrently. Constructed with an `AccountStoring`, a
+     `LegacyAccountMigrating`, and an `AccountSessionFactories` bundle: `scopedTokenStore:
+     (String) -> TokenStoring` and `scopedCalendarSelectionStore: (String) ->
+     CalendarSelectionStoring` (both testable without touching the real Keychain/
+     UserDefaults), a `provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating`,
+     and a `sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth:
+     AccountAuthenticating, calendar: CalendarServicing)` — bundled into one struct because
+     `AccountRegistry.init` would otherwise take 6 parameters, past SwiftLint's
+     `function_parameter_count` limit (discovered by CI). The real factories (wired in
+     `AppDelegate`) build real `KeychainStore`/`UserDefaultsCalendarSelectionStore`/
+     `AuthManager`/`GoogleCalendarAPI`/`CalendarService`(accountId:) instances; tests inject
+     fakes for all of them.
    - `addAccount(provider:)`: build a provisional `AuthManager` over an in-memory
      `TokenStoring`, call `connect(loginHint: nil)`, then `identity()`. If the resolved
      `Account.id` matches an existing session, replace that session's stored token and

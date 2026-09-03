@@ -19,10 +19,12 @@ final class AccountsMenuBuilderTests: XCTestCase {
         AccountsMenuBuilder.accountsMenu(
             for: accounts,
             selectionStore: { _ in FakeCalendarSelectionStore() },
-            onCalendarsChanged: {},
-            onReconnect: { _ in },
-            onSignOut: { _ in },
-            onAddAccount: {}
+            actions: AccountsMenuActions(
+                onCalendarsChanged: {},
+                onReconnect: { _ in },
+                onSignOut: { _ in },
+                onAddAccount: {}
+            )
         )
     }
 
