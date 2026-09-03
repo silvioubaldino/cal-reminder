@@ -50,7 +50,7 @@ private final class MenuItemAction: NSObject {
         self.action = action
     }
 
-    @objc func perform() {
+    @objc func invoke() {
         action()
     }
 }
@@ -142,7 +142,7 @@ enum AccountsMenuBuilder {
 
     private static func actionItem(title: String, action: @escaping () -> Void) -> NSMenuItem {
         let handler = MenuItemAction(action)
-        let item = NSMenuItem(title: title, action: #selector(MenuItemAction.perform), keyEquivalent: "")
+        let item = NSMenuItem(title: title, action: #selector(MenuItemAction.invoke), keyEquivalent: "")
         item.target = handler
         item.representedObject = handler
         return item
