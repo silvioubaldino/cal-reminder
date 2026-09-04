@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fixed: changing which calendars you're alerted on could drop the upcoming reminders of the calendars that stayed selected, until the next event edit; the list is now rebuilt in full when the selection changes.
 - Implemented SPEC-017: a new "Reminders" menu lets you choose which alerts fly — the event's own ones, plus any of at-start/1/5/10/15 minutes before, in any combination; the menu states the current choice at a glance, warns when nothing is selected, and the upcoming reminders are rebuilt the moment you change it.
 - Designed AYD-008 and added RF-15: choosing which reminders fire — the event's own ones plus a set of extra alerts the app adds to every event — with the Extra Reminder glossary term and the rule that combines both (RN-07).
 - Implemented SPEC-016: the menu bar now has an "Accounts" submenu — one entry per connected Google Account, each with its own Calendars, Reconnect, and Sign out, plus "Add Google account…" to connect another one; an Account needing reconnection is marked in the menu.

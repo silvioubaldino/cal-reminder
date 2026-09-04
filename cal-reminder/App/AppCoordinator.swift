@@ -113,10 +113,14 @@ final class AppCoordinator {
         await poll()
     }
 
+    /// The Calendar selection changed (RF-10): drop the armed Triggers and rebuild them from a
+    /// **full resync** — same reason as `remindersChanged()`. The Calendars that stayed selected
+    /// still hold a `syncToken`, so an incremental Poll would report no Events for them and
+    /// leave their upcoming Triggers cancelled and never re-armed.
     func calendarsChanged() {
         Task {
             await scheduler.cancelAll()
-            await poll()
+            await poll(fullResync: true)
         }
     }
 
