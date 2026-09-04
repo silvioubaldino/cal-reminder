@@ -120,6 +120,16 @@ final class AppCoordinator {
         }
     }
 
+    /// The Reminder selection changed (RF-15): drop the armed Triggers and rebuild them from a
+    /// **full resync**. An incremental Poll would return only changed Events (RNF-06), leaving
+    /// the upcoming Triggers cancelled and never re-armed.
+    func remindersChanged() {
+        Task {
+            await scheduler.cancelAll()
+            await poll(fullResync: true)
+        }
+    }
+
     private func syncAccountsState() {
         state.accounts = accounts.sessions.map {
             AccountState(id: $0.id, label: $0.account.label, connectionStatus: $0.connectionStatus, calendars: $0.calendars)

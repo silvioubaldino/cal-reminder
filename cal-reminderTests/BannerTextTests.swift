@@ -34,14 +34,14 @@ final class BannerTextTests: XCTestCase {
         XCTAssertEqual(text, "1:1\nat 09:05 (in 10 min)")
     }
 
-    func test_zeroMinutesBefore() {
-        // Arrange
+    func test_zeroMinutesBefore_readsStartingNow() {
+        // Arrange — an "At start time" Extra Reminder (RF-15)
         let start = date(hour: 8, minute: 30)
 
         // Act
         let text = BannerText.bannerText(title: "Kickoff", start: start, minutesBefore: 0)
 
         // Assert
-        XCTAssertEqual(text, "Kickoff\nat 08:30 (in 0 min)")
+        XCTAssertEqual(text, "Kickoff\nat 08:30 (starting now)")
     }
 }

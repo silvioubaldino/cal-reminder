@@ -6,13 +6,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: AppCoordinator?
     private let flightSpeedStore = UserDefaultsFlightSpeedStore()
     private let skipOnClickStore = UserDefaultsSkipOnClickStore()
+    private let reminderSettingsStore = UserDefaultsReminderSettingsStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let overlayPresenter = OverlayPresenter(
             animator: DefaultOverlayAnimator(speedStore: flightSpeedStore, skipOnClickStore: skipOnClickStore)
         )
 
-        let accountRegistry = Self.makeAccountRegistry()
+        let accountRegistry = Self.makeAccountRegistry(reminderSettingsStore: reminderSettingsStore)
         let scheduler = Scheduler(onFire: { trigger in
             Task { await overlayPresenter.enqueue(trigger) }
         })
@@ -46,9 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onAddAccount: { [weak coordinator] in
                 coordinator?.addAccount()
             },
+            onRemindersChanged: { [weak coordinator] in
+                coordinator?.remindersChanged()
+            },
             speedStore: flightSpeedStore,
             calendarSelectionStore: { UserDefaultsCalendarSelectionStore(accountId: $0) },
-            skipOnClickStore: skipOnClickStore
+            skipOnClickStore: skipOnClickStore,
+            reminderSettingsStore: reminderSettingsStore
         )
         self.statusMenuController = statusMenuController
 
@@ -58,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.start()
     }
 
-    private static func makeAccountRegistry() -> AccountRegistry {
+    private static func makeAccountRegistry(reminderSettingsStore: ReminderSettingsStoring) -> AccountRegistry {
         let scopedTokenStore: (String) -> TokenStoring = {
             KeychainStore(account: KeychainStore.accountScopedKey($0))
         }
@@ -81,7 +86,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
             )
             let api = GoogleCalendarAPI(authManager: auth)
-            let calendar = CalendarService(api: api, accountId: account.id, selectionStore: selectionStore)
+            let calendar = CalendarService(
+                api: api,
+                accountId: account.id,
+                selectionStore: selectionStore,
+                reminderSettingsStore: reminderSettingsStore
+            )
             return (auth, calendar)
         }
 

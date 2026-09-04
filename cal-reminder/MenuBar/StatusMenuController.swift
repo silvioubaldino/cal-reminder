@@ -9,15 +9,18 @@ final class StatusMenuController {
     private let onRefresh: () -> Void
     private let onCalendarsChanged: () -> Void
     private let onAddAccount: () -> Void
+    private let onRemindersChanged: () -> Void
     private let speedStore: FlightSpeedStoring
     private let colorStore: BannerColorStoring
     private let matchCalendarColorStore: MatchCalendarColorStoring
     private let calendarSelectionStore: (String) -> CalendarSelectionStoring
     private let skipOnClickStore: SkipOnClickStoring
+    private let reminderSettingsStore: ReminderSettingsStoring
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
     private var matchCalendarColorItem: NSMenuItem!
     private var accountsMenuItem: NSMenuItem!
+    private var remindersMenu: RemindersMenu!
     private var skipOnClickItem: NSMenuItem!
 
     private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
@@ -33,11 +36,13 @@ final class StatusMenuController {
         onRefresh: @escaping () -> Void = {},
         onCalendarsChanged: @escaping () -> Void = {},
         onAddAccount: @escaping () -> Void = {},
+        onRemindersChanged: @escaping () -> Void = {},
         speedStore: FlightSpeedStoring = UserDefaultsFlightSpeedStore(),
         colorStore: BannerColorStoring = UserDefaultsBannerColorStore(),
         matchCalendarColorStore: MatchCalendarColorStoring = UserDefaultsMatchCalendarColorStore(),
         calendarSelectionStore: @escaping (String) -> CalendarSelectionStoring = { UserDefaultsCalendarSelectionStore(accountId: $0) },
-        skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore()
+        skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore(),
+        reminderSettingsStore: ReminderSettingsStoring = UserDefaultsReminderSettingsStore()
     ) {
         self.onTestAnimation = onTestAnimation
         self.onToggleEnabled = onToggleEnabled
@@ -46,11 +51,13 @@ final class StatusMenuController {
         self.onRefresh = onRefresh
         self.onCalendarsChanged = onCalendarsChanged
         self.onAddAccount = onAddAccount
+        self.onRemindersChanged = onRemindersChanged
         self.speedStore = speedStore
         self.colorStore = colorStore
         self.matchCalendarColorStore = matchCalendarColorStore
         self.calendarSelectionStore = calendarSelectionStore
         self.skipOnClickStore = skipOnClickStore
+        self.reminderSettingsStore = reminderSettingsStore
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "airplane",
@@ -112,6 +119,9 @@ final class StatusMenuController {
         )
         testItem.target = self
         menu.addItem(testItem)
+
+        remindersMenu = RemindersMenu(store: reminderSettingsStore, onRemindersChanged: onRemindersChanged)
+        menu.addItem(remindersMenu.menuItem)
 
         menu.addItem(flightSpeedMenuItem())
         menu.addItem(bannerColorMenuItem())

@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Changelog
@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-017: a new "Reminders" menu lets you choose which alerts fly — the event's own ones, plus any of at-start/1/5/10/15 minutes before, in any combination; the menu states the current choice at a glance, warns when nothing is selected, and the upcoming reminders are rebuilt the moment you change it.
+- Designed AYD-008 and added RF-15: choosing which reminders fire — the event's own ones plus a set of extra alerts the app adds to every event — with the Extra Reminder glossary term and the rule that combines both (RN-07).
 - Implemented SPEC-016: the menu bar now has an "Accounts" submenu — one entry per connected Google Account, each with its own Calendars, Reconnect, and Sign out, plus "Add Google account…" to connect another one; an Account needing reconnection is marked in the menu.
 - Implemented SPEC-015: the app now supports connecting more than one Google Account at once under the hood — each with its own Keychain-stored token and Calendar selection, polled independently so one Account's failure never affects the others; the existing single connected Account migrates over automatically. The menu bar still shows a single Account for now (SPEC-016 adds the "Accounts" menu).
 - Wrote SPEC-015 and SPEC-016: implementation plan for connecting more than one Google Account at the same time, each with its own Calendars selection and an "Accounts" menu.

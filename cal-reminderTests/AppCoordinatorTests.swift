@@ -226,6 +226,25 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
     }
 
+    func test_remindersChangedCancelsSchedulerAndRebuildsTriggersWithAFullResync() async throws {
+        // Arrange — a Reminder-selection change (RF-15) must not wait for the next Poll, and
+        // an incremental one would return no Events (AYD-008)
+        let accounts = FakeAccountsManaging()
+        let upcoming = trigger(id: "evt1#1", minutesFromNow: 5)
+        accounts.pollTriggers = [upcoming]
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(accounts: accounts, scheduler: scheduler)
+
+        // Act
+        coordinator.remindersChanged()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Assert
+        XCTAssertGreaterThanOrEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(accounts.receivedFullResyncFlags, [true])
+        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#1"])
+    }
+
     func test_refreshNowTriggersPollAndTogglesRefreshingFlag() async throws {
         let accounts = FakeAccountsManaging()
         let coordinator = makeCoordinator(accounts: accounts)
