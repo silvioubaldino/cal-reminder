@@ -3,7 +3,7 @@ id: ARCH
 type: architecture
 title: Architecture overview (living C4)
 status: approved
-updated: 2026-09-03
+updated: 2026-09-04
 parents: []
 related: []
 ---
@@ -60,11 +60,11 @@ flowchart TB
 
 | Component | Responsibility | Detailed in |
 |-----------|----------------|-------------|
-| **MenuBar UI** | `NSStatusItem` menu: status, on/off, test, Accounts submenu (add/reconnect/sign out per Account, Calendar selection per Account), Flight Speed, Banner color, quit | AYD-001, AYD-002, AYD-007 |
-| **AppCoordinator** | Wires modules together; holds `AppState`; re-Polls on Calendar-selection changes | AYD-001, AYD-002, AYD-007 |
+| **MenuBar UI** | `NSStatusItem` menu: status, on/off, test, Reminders (Event's own + Extra Reminders), Accounts submenu (add/reconnect/sign out per Account, Calendar selection per Account), Flight Speed, Banner color, quit | AYD-001, AYD-002, AYD-007, AYD-008 |
+| **AppCoordinator** | Wires modules together; holds `AppState`; re-Polls on Calendar-selection changes, and full-resyncs on Reminder-selection changes | AYD-001, AYD-002, AYD-007, AYD-008 |
 | **AccountRegistry** | Owns one `AccountSession` per connected Account; fans Poll out across them; handles add/reconnect/sign-out and the legacy single-account migration | AYD-007 |
 | **AuthManager** *(one per connected Account)* | OAuth PKCE flow + token refresh + Keychain storage, scoped to its Account | AYD-001, AYD-007 |
-| **CalendarService** *(one per connected Account)* | List that Account's Calendars, Poll each selected one (per-Calendar sync), parse Events, resolve Reminders → Triggers | AYD-001, AYD-002, AYD-007 |
+| **CalendarService** *(one per connected Account)* | List that Account's Calendars, Poll each selected one (per-Calendar sync), parse Events, resolve the effective Reminders (Event's own + Extra Reminders) → Triggers | AYD-001, AYD-002, AYD-007, AYD-008 |
 | **Scheduler** | Precise local timers per Trigger + dedupe + sleep/wake handling | AYD-001 |
 | **OverlayPresenter** | `NSPanel` over all windows + animation + FIFO queue | AYD-001 |
 
