@@ -18,6 +18,7 @@ final class CalendarService: CalendarServicing {
     private let api: GoogleCalendarAPIProtocol
     private let accountId: String
     private let selectionStore: CalendarSelectionStoring
+    private let reminderSettingsStore: ReminderSettingsStoring
     private let clock: () -> Date
 
     private var syncTokens: [String: String] = [:]
@@ -27,11 +28,13 @@ final class CalendarService: CalendarServicing {
         api: GoogleCalendarAPIProtocol,
         accountId: String,
         selectionStore: CalendarSelectionStoring,
+        reminderSettingsStore: ReminderSettingsStoring = UserDefaultsReminderSettingsStore(),
         clock: @escaping () -> Date = Date.init
     ) {
         self.api = api
         self.accountId = accountId
         self.selectionStore = selectionStore
+        self.reminderSettingsStore = reminderSettingsStore
         self.clock = clock
     }
 
@@ -51,6 +54,9 @@ final class CalendarService: CalendarServicing {
         print("[poll] \(calendars.count) available Calendars \(calendars.map(\.id)); stored selection=\(String(describing: selectionStore.selectedCalendarIds)); polling \(selectedIds)")
 
         let colorsById = Dictionary(calendars.map { ($0.id, $0.backgroundColor) }, uniquingKeysWith: { _, last in last })
+        // Read once per Poll, not at init: a Reminder-selection change (RF-15) must be picked
+        // up by the very next Poll — which is the full resync the change itself triggers.
+        let reminderSettings = reminderSettingsStore.settings
 
         var triggers: [Trigger] = []
         for calendarId in selectedIds {
@@ -58,6 +64,7 @@ final class CalendarService: CalendarServicing {
                 triggers += try await pollTriggers(
                     calendarId: calendarId,
                     calendarColorHex: colorsById[calendarId] ?? nil,
+                    reminderSettings: reminderSettings,
                     retryOnExpiredToken: true
                 )
             } catch AuthError.refreshTokenRevoked {
@@ -69,7 +76,12 @@ final class CalendarService: CalendarServicing {
         return triggers
     }
 
-    private func pollTriggers(calendarId: String, calendarColorHex: String?, retryOnExpiredToken: Bool) async throws -> [Trigger] {
+    private func pollTriggers(
+        calendarId: String,
+        calendarColorHex: String?,
+        reminderSettings: ReminderSettings,
+        retryOnExpiredToken: Bool
+    ) async throws -> [Trigger] {
         let now = clock()
         let events: [GoogleEvent]
         let nextSyncToken: String?
@@ -83,7 +95,12 @@ final class CalendarService: CalendarServicing {
             )
         } catch GoogleCalendarAPIError.unexpectedStatus(410) where retryOnExpiredToken {
             syncTokens[calendarId] = nil
-            return try await pollTriggers(calendarId: calendarId, calendarColorHex: calendarColorHex, retryOnExpiredToken: false)
+            return try await pollTriggers(
+                calendarId: calendarId,
+                calendarColorHex: calendarColorHex,
+                reminderSettings: reminderSettings,
+                retryOnExpiredToken: false
+            )
         }
 
         if let nextSyncToken {
@@ -100,7 +117,11 @@ final class CalendarService: CalendarServicing {
                 return []
             }
 
-            let minutesList = ReminderResolver.popupReminderMinutes(for: event, calendarDefaults: defaults)
+            let minutesList = ReminderResolver.popupReminderMinutes(
+                for: event,
+                calendarDefaults: defaults,
+                settings: reminderSettings
+            )
             print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
             return minutesList.map { minutes in
                 Trigger(

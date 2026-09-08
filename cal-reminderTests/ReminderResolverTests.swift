@@ -120,4 +120,126 @@ final class ReminderResolverTests: XCTestCase {
         // Assert
         XCTAssertEqual(minutes, [5])
     }
+
+    // MARK: - RN-07: union with the Extra Reminders (RF-15)
+
+    func test_defaultSettings_behaveExactlyLikeBeforeExtraReminders() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 10)])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: .default
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [10])
+    }
+
+    func test_extraReminder_isAddedOnTopOfTheEventsOwn() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 10)])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: true, extraMinutes: [1])
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [10, 1])
+    }
+
+    func test_fallbackStillApplies_underAnExtraReminder() {
+        // Arrange
+        let event = event(useDefault: true)
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: true, extraMinutes: [1])
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [5, 1])
+    }
+
+    func test_extraReminderDuplicatingTheEventsOwn_resolvesOnce() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 5)])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: true, extraMinutes: [5])
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [5])
+    }
+
+    func test_inheritOff_resolvesToTheExtraRemindersOnly() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 30)])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [GoogleCalendarDefaultReminder(method: "popup", minutes: 20)],
+            settings: ReminderSettings(inheritEventReminders: false, extraMinutes: [1, 15])
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [1, 15])
+    }
+
+    func test_inheritOff_doesNotApplyTheFiveMinuteFallback() {
+        // Arrange
+        let event = event(useDefault: true)
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: false, extraMinutes: [1])
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [1])
+    }
+
+    func test_nothingSelected_resolvesToNoReminderAtAll() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 10)])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: false, extraMinutes: [])
+        )
+
+        // Assert
+        XCTAssertTrue(minutes.isEmpty)
+    }
+
+    func test_extraRemindersAreOrderedAscending_afterTheInheritedOnes() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 10)])
+
+        // Act
+        let minutes = ReminderResolver.popupReminderMinutes(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: true, extraMinutes: [15, 0, 1])
+        )
+
+        // Assert
+        XCTAssertEqual(minutes, [10, 0, 1, 15])
+    }
 }
