@@ -1,11 +1,12 @@
 ---
 id: AYD-003
 type: design
-status: review
-updated: 2026-07-16
+status: superseded
+updated: 2026-09-08
 parents: [RNF-07, RNF-10, REQ-01]
 children: [SPEC-009]
 related: [GLO, AYD-001, TDR-001, TDR-002, TDR-003]
+superseded_by: AYD-009
 ---
 
 # AYD-003: Mac App Store distribution & OAuth rearchitecture

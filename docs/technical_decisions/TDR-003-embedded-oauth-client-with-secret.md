@@ -2,11 +2,11 @@
 id: TDR-003
 type: tdr
 title: Embedded OAuth installed-app client (client_id + client_secret)
-status: accepted
-updated: 2026-07-16
+status: superseded
+updated: 2026-09-08
 parents: [SPEC-009]
 related: [AYD-003, TDR-001, TDR-002, RNF-10]
-superseded_by: null
+superseded_by: TDR-007
 ---
 
 # TDR-003: Embedded OAuth installed-app client (client_id + client_secret)

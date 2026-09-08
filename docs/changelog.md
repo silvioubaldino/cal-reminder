@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-09-04
+updated: 2026-09-08
 ---
 
 # Changelog
@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Revoked the Mac App Store as the distribution target and replaced it with direct distribution plus self-updating: the app will be downloaded as a signed, notarized disk image or installed with Homebrew, and will check for and install new versions on its own from a feed only the project can sign (AYD-009 and AYD-010, superseding AYD-003 and AYD-005; RF-16, RNF-07, RNF-11, TDR-006).
+- Stated the distribution model in the requirements: the app is source-available and sold on trust — anyone can build and run it for free with their own Google credentials, and what a purchase buys is the ready-to-run, auto-updating build, with no licence key or feature gate anywhere in the app (RNF-12).
+- Decided that the app's Google credentials must be rotated and injected at build time instead of living in the repository, now that the source is meant to be public (TDR-007, superseding TDR-003; RNF-10).
 - Fixed: changing which calendars you're alerted on could drop the upcoming reminders of the calendars that stayed selected, until the next event edit; the list is now rebuilt in full when the selection changes.
 - Implemented SPEC-017: a new "Reminders" menu lets you choose which alerts fly — the event's own ones, plus any of at-start/1/5/10/15 minutes before, in any combination; the menu states the current choice at a glance, warns when nothing is selected, and the upcoming reminders are rebuilt the moment you change it.
 - Designed AYD-008 and added RF-15: choosing which reminders fire — the event's own ones plus a set of extra alerts the app adds to every event — with the Extra Reminder glossary term and the rule that combines both (RN-07).

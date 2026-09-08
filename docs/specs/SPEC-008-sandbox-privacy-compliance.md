@@ -1,14 +1,19 @@
 ---
 id: SPEC-008
 type: spec
-status: draft
-parents: [AYD-005]
+status: review
+parents: [AYD-005]   # superseded by AYD-010 — this SPEC is under review
 related: [GLO, CONV]
-updated: 2026-07-16
+updated: 2026-09-08
 ---
 
 # SPEC-008: App Sandbox & privacy compliance artifacts — what + how
 
+> **Under review (2026-09-08).** Its parent AYD-005 was superseded by **AYD-010**: the Mac App
+> Store target is withdrawn (AYD-009), so this SPEC's App Review-driven criteria no longer apply
+> and its signing/notarization half is now owned by SPEC-019. The artifacts it already delivered
+> (entitlements, privacy manifest, icon, privacy policy) stand — see AYD-010 for what survives.
+>
 > Adds the App Sandbox entitlements, privacy manifest, app icon, and bundle metadata a Mac
 > App Store submission needs. Closes RNF-08 (and reinforces RNF-05). Implements AYD-005;
 > doesn't redefine it. **Artifacts only** — no app behavior changes.
