@@ -30,6 +30,44 @@ read-only Calendar access, then put its id and secret in `Config/Secrets.xcconfi
 documentation are the reference for setting one up and for how its publishing status
 affects token lifetime.
 
+## Releasing
+
+Pushing a tag matching `v*` (e.g. `v1.2.0`) runs `.github/workflows/release.yml`, which builds,
+signs, notarizes and publishes the Distributed Build — nobody needs to do this by hand. It is the
+only workflow that touches secrets; `ci.yml` (build/test/lint on every push and PR) stays
+credential-free.
+
+**What the tag drives:**
+- `CFBundleShortVersionString` is the tag minus its `v` (`v1.2.0` → `1.2.0`).
+- `CFBundleVersion` is `git rev-list --count HEAD` at that tag — deterministic and monotonic
+  along the branch; the workflow refuses to publish a Release whose build number does not exceed
+  the last published one.
+
+**Repository secrets** the workflow expects (Settings → Secrets and variables → Actions):
+
+| Secret | Purpose |
+|---|---|
+| `DEVELOPER_ID_CERT_P12` | Base64-encoded Developer ID Application certificate + private key |
+| `DEVELOPER_ID_CERT_PASSWORD` | Password protecting that `.p12` |
+| `APPLE_TEAM_ID` | Apple Developer Team ID |
+| `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8` | App Store Connect API key used by `notarytool` |
+| `SPARKLE_ED_PRIVATE_KEY` | EdDSA private key that signs each Appcast entry (TDR-006) |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | The project's own OAuth client, injected only into the Distributed Build (TDR-007) |
+
+None of these ever reaches the repository, a build log, or a Source Build.
+
+**Running the same steps locally** (with the secrets above exported as environment variables and
+a Developer ID certificate in your login keychain):
+```
+scripts/release/build.sh <version> <build-number>       # archive + export
+scripts/release/notarize.sh build/export/cal-reminder.app
+scripts/release/dmg.sh build/export/cal-reminder.app <version>
+scripts/release/notarize.sh build/cal-reminder-<version>.dmg
+scripts/release/verify.sh build/export/cal-reminder.app build/cal-reminder-<version>.dmg
+```
+`verify.sh` runs the same checks (`codesign --verify`, `spctl --assess`, `stapler validate`) the
+workflow uses as its publish gate.
+
 ## Source Build vs Distributed Build
 
 | | Source Build | Distributed Build |

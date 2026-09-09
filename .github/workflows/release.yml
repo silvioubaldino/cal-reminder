@@ -1,0 +1,170 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  SPARKLE_VERSION: "2.6.4"
+
+jobs:
+  release:
+    name: Sign, notarize & publish
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Select latest Xcode
+        run: |
+          latest="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+
+      - name: Install tools
+        run: brew install xcodegen create-dmg
+
+      - name: Derive version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          build="$(git rev-list --count HEAD)"
+          echo "Version $version, build $build"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch previous Appcast
+        id: previous_appcast
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+          if git show origin/gh-pages:appcast.xml > build-previous-appcast.xml 2>/dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assert monotonic build number
+        if: steps.previous_appcast.outputs.found == 'true'
+        run: |
+          previous_max="$(grep -o '<sparkle:version>[0-9]*</sparkle:version>' build-previous-appcast.xml \
+            | grep -o '[0-9]*' | sort -n | tail -1)"
+          echo "Previous highest build: ${previous_max:-none}"
+          if [ -n "$previous_max" ] && [ "${{ steps.version.outputs.build }}" -le "$previous_max" ]; then
+            echo "::error::Computed CFBundleVersion (${{ steps.version.outputs.build }}) is not greater than the last published one ($previous_max)."
+            exit 1
+          fi
+
+      - name: Import signing certificate
+        env:
+          DEVELOPER_ID_CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+
+          echo "$DEVELOPER_ID_CERT_P12" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$DEVELOPER_ID_CERT_PASSWORD" -A \
+            -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+
+          rm -f "$CERT_PATH"
+          echo "RELEASE_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Build & export
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+        run: scripts/release/build.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.build }}"
+
+      - name: Notarize & staple the app
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: scripts/release/notarize.sh build/export/cal-reminder.app
+
+      - name: Build the disk image
+        env:
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+        run: scripts/release/dmg.sh build/export/cal-reminder.app "${{ steps.version.outputs.version }}"
+
+      - name: Notarize & staple the disk image
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: scripts/release/notarize.sh "build/cal-reminder-${{ steps.version.outputs.version }}.dmg"
+
+      - name: Verify release invariants
+        run: scripts/release/verify.sh build/export/cal-reminder.app "build/cal-reminder-${{ steps.version.outputs.version }}.dmg"
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "build/cal-reminder-${{ steps.version.outputs.version }}.dmg" \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes
+
+      - name: Sign the Appcast entry
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          mkdir -p build/appcast-new
+          cp "build/cal-reminder-${{ steps.version.outputs.version }}.dmg" build/appcast-new/
+
+          curl -fsSL -o sparkle.tar.xz \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          mkdir -p sparkle-tools && tar -xJf sparkle.tar.xz -C sparkle-tools
+
+          sparkle-tools/bin/generate_appcast \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" \
+            -o build/appcast-item.xml \
+            build/appcast-new
+
+      - name: Publish the Appcast
+        run: |
+          python3 scripts/release/merge_appcast.py \
+            build/appcast-item.xml build-previous-appcast.xml build/appcast.xml
+
+          git fetch origin gh-pages 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add build/gh-pages origin/gh-pages
+          else
+            git worktree add --detach build/gh-pages
+            git -C build/gh-pages checkout --orphan gh-pages
+            git -C build/gh-pages rm -rf . > /dev/null 2>&1 || true
+          fi
+
+          cp build/appcast.xml build/gh-pages/appcast.xml
+          git -C build/gh-pages add appcast.xml
+          git -C build/gh-pages -c user.name="cal-reminder release bot" \
+            -c user.email="release-bot@users.noreply.github.com" \
+            commit -m "Publish Appcast entry for ${{ github.ref_name }}" || echo "Nothing to commit"
+          git -C build/gh-pages push origin HEAD:gh-pages
+
+      - name: Delete temporary keychain
+        if: always()
+        run: |
+          if [ -n "${RELEASE_KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$RELEASE_KEYCHAIN_PATH" || true
+          fi
