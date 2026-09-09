@@ -3,8 +3,9 @@
 A native macOS menu bar app that connects to Google Calendar and flies a little airplane
 pulling a banner across the screen — over all windows — at each event's reminder time.
 
-The code is published under an open license: you're free to clone it, adapt it, and run
-your own build. A purchase buys the **Distributed Build** instead — signed, notarized, the
+The code is published under an open license ([PolyForm Shield 1.0.0](LICENSE.md)): you're
+free to clone it, adapt it, and run your own build for any purpose that doesn't compete with
+this project. A purchase buys the **Distributed Build** instead — signed, notarized, the
 project's own Google credentials, downloaded as a `.dmg` or via Homebrew, and self-updating
 (RF-16, RNF-07). Both builds are the same code; see [Source Build vs Distributed
 Build](#source-build-vs-distributed-build).

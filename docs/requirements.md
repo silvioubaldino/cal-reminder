@@ -3,7 +3,7 @@ id: REQ-01
 type: requirements
 title: Requirements and glossary
 status: approved
-updated: 2026-09-08
+updated: 2026-09-09
 parents: []
 children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010]
 related: [GLO]
@@ -53,7 +53,7 @@ related: [GLO]
 | RNF-09 | Quality gate | Every change is built, tested, and linted automatically | CI builds the app, runs the test suite, and lints the sources on each push/PR; a failure blocks the merge (AYD-004) |
 | RNF-10 | Security (app credential) | The **app's** OAuth client secret is not exposed | Two levels. **Now (must):** the secret is not in the repository at all — the source is public (RNF-12), so it is injected at build time and ships only in the Distributed Build (TDR-007). **Target:** the token exchange/refresh runs behind an app-owned backend (token broker) so the secret never ships in a binary either; auto-update (RF-16) makes rotating it a same-day operation instead of a reinstall (AYD-009) |
 | RNF-11 | Security (update channel) | An update can only come from the project | Every Release is EdDSA-signed and its Appcast served over HTTPS; the app refuses any update whose signature does not verify against the public key embedded in the binary, so control of the feed or of the download host is not enough to ship code to a user's machine. The private signing key exists only in a Keychain and as a CI secret, never in the repository (AYD-009, TDR-006) |
-| RNF-12 | Distribution model | Source-available, sold on trust | The repository builds and runs a **fully functional** app with no purchase, no license key, no feature gate, no trial timer and no phone-home; the builder supplies their own Google OAuth client (TDR-007). What a purchase buys is the Distributed Build's convenience — signed, notarized, credentials included, auto-updating — never a capability withheld from the source (AYD-009) |
+| RNF-12 | Distribution model | Source-available, sold on trust | The repository builds and runs a **fully functional** app with no purchase, no license key, no feature gate, no trial timer and no phone-home; the builder supplies their own Google OAuth client (TDR-007). What a purchase buys is the Distributed Build's convenience — signed, notarized, credentials included, auto-updating — never a capability withheld from the source (AYD-009). The repository is licensed under PolyForm Shield 1.0.0 (`LICENSE.md`): free to clone, build and use for any purpose, but not to redistribute as a competing product |
 
 ## Business rules
 - RN-01: Only timed Events generate Triggers; all-day Events are ignored.
