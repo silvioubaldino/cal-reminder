@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Wrote SPEC-019 and SPEC-020: implementation plan for cutting a release — a signed, notarized disk image built from a tag — and for the app checking that feed and updating itself, with a build from source keeping no updater at all.
 - Wrote SPEC-018: implementation plan for taking the app's Google credentials out of the repository and making a build from source a documented, working path — a fresh clone builds with no credential and the app says what it needs instead of failing silently.
 - Revoked the Mac App Store as the distribution target and replaced it with direct distribution plus self-updating: the app will be downloaded as a signed, notarized disk image or installed with Homebrew, and will check for and install new versions on its own from a feed only the project can sign (AYD-009 and AYD-010, superseding AYD-003 and AYD-005; RF-16, RNF-07, RNF-11, TDR-006).
 - Stated the distribution model in the requirements: the app is source-available and sold on trust — anyone can build and run it for free with their own Google credentials, and what a purchase buys is the ready-to-run, auto-updating build, with no licence key or feature gate anywhere in the app (RNF-12).
