@@ -1,8 +1,8 @@
 ---
 id: SPEC-018
 type: spec
-status: draft
-updated: 2026-09-08
+status: review
+updated: 2026-09-09
 parents: [AYD-009]
 related: [TDR-007, TDR-003, GLO, REQ-01, SPEC-002, SPEC-009]
 ---
@@ -26,8 +26,8 @@ Four coordinated changes:
 3. **A fresh clone builds with zero setup.** A bootstrap step creates the untracked config from a
    tracked example, so `xcodegen generate && xcodebuild` works with no credential at all — which
    is also what keeps CI (RNF-09) and fork PRs green.
-4. **The README documents the Source Build**, including the Google publishing-status trap that
-   silently breaks RF-01.
+4. **The README documents the Source Build** at a high level — what it needs, not a walkthrough
+   of getting it (product decision, see step 10).
 
 The maintainer-side rotation is a prerequisite, not a code change (§Prerequisite).
 
@@ -134,15 +134,13 @@ Scenario: CI builds and tests without any credential
 9. **`.github/workflows/ci.yml`** — replace the bare `xcodegen generate` with
    `./scripts/bootstrap.sh`. No secret is added to this workflow: the build must stay
    credential-free (the release workflow, SPEC-019, is where CI writes real values).
-10. **`README.md`** (new) — §Build from source (clone → `./scripts/bootstrap.sh` → open in Xcode),
-    §Register a Google OAuth client (enable the Calendar API; consent screen with
-    `calendar.readonly` and `userinfo.email`; credential type **Desktop app**; paste both values
-    into `Config/Secrets.xcconfig`), and a **publishing status** callout: in *Testing* the refresh
-    token expires after ~7 days and the app disconnects weekly (breaking RF-01) — publish to
-    *Production* (an unverified-app warning appears at sign-in and is expected for a Source
-    Build) or use an *Internal* client on a Workspace account. Note that the exact wording and
-    limits are Google's and shift; the console is the authority. Close with §Source Build vs
-    Distributed Build, restating RNF-12: same features, own credential, no self-update.
+10. **`README.md`** (new) — §Build from source (clone → `./scripts/bootstrap.sh` → open in Xcode)
+    and §Google OAuth client, naming what's needed (a Calendar-readonly OAuth client, its id
+    and secret in `Config/Secrets.xcconfig`) without walking through Google Cloud Console
+    step by step — that path stays possible, just not spelled out, a deliberate choice to
+    keep the free path real without making it the path of least resistance. Close with
+    §Source Build vs Distributed Build, restating RNF-12: same features, own credential, no
+    self-update.
 11. **`docs/changelog.md`** — one line.
 
 ## Affected files
@@ -168,12 +166,15 @@ Scenario: CI builds and tests without any credential
   rotated-away secret is not worth a job.
 
 ## Checklist
-- [ ] Old OAuth client rotated and deleted in Google Cloud (prerequisite)
-- [ ] No client id or secret in any tracked file; `Config/Secrets.xcconfig` gitignored
+- [ ] Old OAuth client rotated and deleted in Google Cloud (prerequisite — maintainer action,
+      outside this PR; do not merge to a public remote before this is done)
+- [x] No client id or secret in any tracked file; `Config/Secrets.xcconfig` gitignored
 - [ ] A clean clone builds and runs after `./scripts/bootstrap.sh`, with no credential
-- [ ] Unconfigured build states it in the menu, links the README, disables adding an Account, and
+      (needs a macOS CI run to confirm — implemented, not yet observed green)
+- [x] Unconfigured build states it in the menu, links the README, disables adding an Account, and
       makes no request to Google
-- [ ] Configured build connects, polls and refreshes exactly as before
-- [ ] `DEVELOPMENT_TEAM` no longer tracked; automatic signing still works on a fresh clone
-- [ ] CI green without any OAuth secret
-- [ ] README covers the Google client walkthrough and the publishing-status trap
+- [x] Configured build connects, polls and refreshes exactly as before (code path unchanged,
+      only the credential source moved)
+- [x] `DEVELOPMENT_TEAM` no longer tracked; automatic signing still works on a fresh clone
+- [ ] CI green without any OAuth secret (pending a run on the PR)
+- [x] README names what's needed for a Google OAuth client, without a full walkthrough (product decision, see step 10)

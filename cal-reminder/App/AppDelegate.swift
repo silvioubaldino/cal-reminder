@@ -60,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStateChange = { [weak statusMenuController] state in
             statusMenuController?.render(state)
         }
+
+        guard GoogleOAuthConfig.bundled != nil else {
+            coordinator.setOAuthConfigured(false)
+            return
+        }
         coordinator.start()
     }
 
@@ -72,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating = { tokenStore in
             AuthManager(
-                config: .embedded,
+                config: GoogleOAuthConfig.bundled!,
                 tokenStore: tokenStore,
                 httpClient: URLSessionHTTPClient(),
                 authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
@@ -80,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing) = { account, tokenStore, selectionStore in
             let auth = AuthManager(
-                config: .embedded,
+                config: GoogleOAuthConfig.bundled!,
                 tokenStore: tokenStore,
                 httpClient: URLSessionHTTPClient(),
                 authorizationCodeProvider: LoopbackAuthorizationCodeProvider()

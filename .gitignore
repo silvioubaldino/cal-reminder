@@ -12,3 +12,6 @@ build/
 
 # macOS
 .DS_Store
+
+# Untracked build-time credentials (SPEC-018) — copy Config/Secrets.example.xcconfig
+Config/Secrets.xcconfig

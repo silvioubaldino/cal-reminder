@@ -19,8 +19,10 @@ struct AppState: Equatable {
     var enabled = true
     var nextTrigger: Trigger?
     var refreshing = false
+    var oauthConfigured = true
 
     var statusTitle: String {
+        if !oauthConfigured { return "Setup needed — no Google client" }
         if accounts.isEmpty { return "Not connected" }
 
         let needingReauth = accounts.filter { $0.connectionStatus == .needsReauth }.count

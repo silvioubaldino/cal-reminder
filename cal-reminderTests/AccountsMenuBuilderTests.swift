@@ -33,6 +33,23 @@ final class AccountsMenuBuilderTests: XCTestCase {
 
         XCTAssertEqual(menu.items.count, 1)
         XCTAssertEqual(menu.items.first?.title, "Add Google account…")
+        XCTAssertTrue(menu.items.first?.isEnabled ?? false)
+    }
+
+    func test_addAccountDisabled_whenOAuthNotConfigured() {
+        let menu = AccountsMenuBuilder.accountsMenu(
+            for: [],
+            selectionStore: { _ in FakeCalendarSelectionStore() },
+            actions: AccountsMenuActions(
+                onCalendarsChanged: {},
+                onReconnect: { _ in },
+                onSignOut: { _ in },
+                onAddAccount: {}
+            ),
+            oauthConfigured: false
+        )
+
+        XCTAssertFalse(menu.items.first?.isEnabled ?? true)
     }
 
     func test_rowCountMatchesAccountsPlusSeparatorPlusAddAccount() {

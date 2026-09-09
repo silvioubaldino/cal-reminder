@@ -24,6 +24,7 @@ final class StatusMenuController {
     private var skipOnClickItem: NSMenuItem!
 
     private let statusLabel = NSMenuItem(title: "Not connected", action: nil, keyEquivalent: "")
+    private let setupGuideItem = NSMenuItem(title: "How to set up a Google client…", action: nil, keyEquivalent: "")
     private let nextTriggerLabel = NSMenuItem(title: "No upcoming reminders", action: nil, keyEquivalent: "")
     private let refreshItem = NSMenuItem(title: "Refresh now", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
@@ -81,6 +82,8 @@ final class StatusMenuController {
         refreshItem.title = state.refreshing ? "Refreshing…" : "Refresh now"
         refreshItem.isEnabled = !state.refreshing
 
+        setupGuideItem.isHidden = state.oauthConfigured
+
         accountsMenuItem.submenu = AccountsMenuBuilder.accountsMenu(
             for: state.accounts,
             selectionStore: calendarSelectionStore,
@@ -89,7 +92,8 @@ final class StatusMenuController {
                 onReconnect: onReconnect,
                 onSignOut: onSignOut,
                 onAddAccount: onAddAccount
-            )
+            ),
+            oauthConfigured: state.oauthConfigured
         )
     }
 
@@ -98,6 +102,12 @@ final class StatusMenuController {
 
         statusLabel.isEnabled = false
         menu.addItem(statusLabel)
+
+        setupGuideItem.action = #selector(handleOpenSetupGuide)
+        setupGuideItem.target = self
+        setupGuideItem.isHidden = true
+        menu.addItem(setupGuideItem)
+
         nextTriggerLabel.isEnabled = false
         menu.addItem(nextTriggerLabel)
 
@@ -218,6 +228,11 @@ final class StatusMenuController {
 
     @objc private func handleRefresh() {
         onRefresh()
+    }
+
+    @objc private func handleOpenSetupGuide() {
+        guard let url = URL(string: "https://github.com/silvioubaldino/cal-reminder/blob/main/README.md") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func handleSelectSpeed(_ sender: NSMenuItem) {

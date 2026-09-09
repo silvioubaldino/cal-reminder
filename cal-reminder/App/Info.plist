@@ -28,5 +28,9 @@
 	<string>NSApplication</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>GoogleOAuthClientID</key>
+	<string>$(GOOGLE_OAUTH_CLIENT_ID)</string>
+	<key>GoogleOAuthClientSecret</key>
+	<string>$(GOOGLE_OAUTH_CLIENT_SECRET)</string>
 </dict>
 </plist>

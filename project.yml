@@ -10,7 +10,6 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "13.0"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ""
 
 targets:
   cal-reminder:
@@ -18,6 +17,9 @@ targets:
     platform: macOS
     sources:
       - path: cal-reminder
+    configFiles:
+      Debug: Config/Secrets.xcconfig
+      Release: Config/Secrets.xcconfig
     info:
       path: cal-reminder/App/Info.plist
       properties:
@@ -28,6 +30,8 @@ targets:
         NSHumanReadableCopyright: "© 2026 Silvio Ubaldino"
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.productivity
+        GoogleOAuthClientID: $(GOOGLE_OAUTH_CLIENT_ID)
+        GoogleOAuthClientSecret: $(GOOGLE_OAUTH_CLIENT_SECRET)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.silvioubaldino.cal-reminder

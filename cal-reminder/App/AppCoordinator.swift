@@ -48,6 +48,11 @@ final class AppCoordinator {
         }
     }
 
+    func setOAuthConfigured(_ configured: Bool) {
+        state.oauthConfigured = configured
+        notify()
+    }
+
     func toggleEnabled() {
         state.enabled.toggle()
         let enabled = state.enabled

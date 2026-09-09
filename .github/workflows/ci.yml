@@ -28,7 +28,7 @@ jobs:
         run: brew install xcodegen swiftlint
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: ./scripts/bootstrap.sh
 
       - name: Lint
         run: swiftlint lint --strict
