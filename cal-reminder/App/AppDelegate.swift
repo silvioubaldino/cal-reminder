@@ -61,9 +61,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusMenuController?.render(state)
         }
 
-        // No bundled OAuth client (SPEC-018): render the unconfigured state and stop here.
-        // Starting the Poll loop would eventually exercise a session factory that force-unwraps
-        // `GoogleOAuthConfig.bundled`, which is exactly what must never happen with no client.
         guard GoogleOAuthConfig.bundled != nil else {
             coordinator.setOAuthConfigured(false)
             return
@@ -78,8 +75,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let scopedCalendarSelectionStore: (String) -> CalendarSelectionStoring = {
             UserDefaultsCalendarSelectionStore(accountId: $0)
         }
-        // Force-unwrapped: these factories only run once the Poll loop is started, and
-        // AppDelegate never starts it without a bundled config (see applicationDidFinishLaunching).
         let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating = { tokenStore in
             AuthManager(
                 config: GoogleOAuthConfig.bundled!,

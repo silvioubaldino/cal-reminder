@@ -26,8 +26,6 @@ final class GoogleOAuthConfigTests: XCTestCase {
     }
 
     func test_make_nil_forExampleFileValues() {
-        // Config/Secrets.example.xcconfig ships both keys empty — a never-configured
-        // clone must be reported unconfigured, not crash on an empty client id.
         XCTAssertNil(GoogleOAuthConfig.make(clientID: "", clientSecret: ""))
     }
 }
