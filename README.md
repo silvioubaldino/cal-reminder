@@ -80,3 +80,7 @@ workflow uses as its publish gate.
 
 Building from source is never a lesser version of the app — it's the same code, with your
 own credentials instead of a purchase.
+
+A Source Build never checks for updates: it has no feed it can safely trust, and pointing it at
+the project's own would silently replace your build — Google client and all — with the
+project's. The menu says "Updates: source build" instead of hiding the control.

@@ -7,6 +7,11 @@ included:
   - cal-reminder
   - cal-reminderTests
 
+# SPM checkouts (e.g. Sparkle) resolve outside these paths; excluded defensively
+# in case a build directory ever lands under the scanned ones.
+excluded:
+  - .build
+
 disabled_rules:
   - force_try                        # ratchet: test JSON fixtures build data with `try!`
   - todo                             # ratchet: don't fail the build on TODO/FIXME markers

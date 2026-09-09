@@ -53,6 +53,11 @@ final class AppCoordinator {
         notify()
     }
 
+    func setUpdateStatus(_ status: UpdateStatus) {
+        state.updateStatus = status
+        notify()
+    }
+
     func toggleEnabled() {
         state.enabled.toggle()
         let enabled = state.enabled

@@ -88,4 +88,17 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(state.statusTitle, "Setup needed — no Google client")
     }
+
+    func test_updateStatus_defaultsToSourceBuild() {
+        let state = AppState()
+
+        XCTAssertEqual(state.updateStatus, .sourceBuild)
+    }
+
+    func test_updateStatus_configured_carriesVersion() {
+        var state = AppState()
+        state.updateStatus = .configured(version: "1.2.0")
+
+        XCTAssertEqual(state.updateStatus, .configured(version: "1.2.0"))
+    }
 }
