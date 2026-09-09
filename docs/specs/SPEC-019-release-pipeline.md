@@ -1,8 +1,8 @@
 ---
 id: SPEC-019
 type: spec
-status: draft
-updated: 2026-09-08
+status: review
+updated: 2026-09-09
 parents: [AYD-009, AYD-010]
 related: [TDR-006, SPEC-018, SPEC-007, GLO, REQ-01]
 ---

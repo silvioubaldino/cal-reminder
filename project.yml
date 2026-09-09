@@ -25,8 +25,8 @@ targets:
       properties:
         LSUIElement: true
         CFBundleDisplayName: cal-reminder
-        CFBundleShortVersionString: "0.1"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSHumanReadableCopyright: "© 2026 Silvio Ubaldino"
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.productivity
