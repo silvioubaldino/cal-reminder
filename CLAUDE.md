@@ -2,8 +2,11 @@
 
 Native **macOS** app that connects to Google Calendar and flies a little airplane pulling a
 banner across the screen — over all windows — at each event's reminder time. It is built to
-be **distributed** (Mac App Store) and **sold** — a commercial product, held to a
-distributable bar on security and privacy. Single-part project (one app). Documentation is
+be **distributed directly** — signed, notarized, downloaded as a `.dmg` or installed with
+Homebrew, and self-updating (RF-16) — and **sold on trust**: the source is public and anyone
+can build it for free with their own Google credentials, while a purchase buys the ready-to-run,
+auto-updating build (RNF-12). Not an App Store app (AYD-009). It is a commercial product, held
+to a distributable bar on security and privacy. Single-part project (one app). Documentation is
 **spec-driven** and lean.
 
 ## Start here
