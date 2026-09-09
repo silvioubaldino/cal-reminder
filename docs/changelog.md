@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-019: pushing a version tag now builds, signs, notarizes and publishes the app as a downloadable disk image with a signed update feed, refusing to publish anything that fails verification.
 - Implemented SPEC-018: the app's Google client credentials are no longer in the repository — a fresh clone builds and runs with no credential at all, the menu says so and links to the setup guide instead of failing silently, and a configured build behaves exactly as before.
 - Wrote SPEC-019 and SPEC-020: implementation plan for cutting a release — a signed, notarized disk image built from a tag — and for the app checking that feed and updating itself, with a build from source keeping no updater at all.
 - Wrote SPEC-018: implementation plan for taking the app's Google credentials out of the repository and making a build from source a documented, working path — a fresh clone builds with no credential and the app says what it needs instead of failing silently.
