@@ -14,12 +14,18 @@ struct AccountState: Identifiable, Equatable {
     var calendars: [CalendarInfo] = []
 }
 
+enum UpdateStatus: Equatable {
+    case configured(version: String)
+    case sourceBuild
+}
+
 struct AppState: Equatable {
     var accounts: [AccountState] = []
     var enabled = true
     var nextTrigger: Trigger?
     var refreshing = false
     var oauthConfigured = true
+    var updateStatus: UpdateStatus = .sourceBuild
 
     var statusTitle: String {
         if !oauthConfigured { return "Setup needed — no Google client" }

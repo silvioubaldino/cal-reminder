@@ -9,6 +9,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let reminderSettingsStore = UserDefaultsReminderSettingsStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let updateConfiguration = UpdateConfiguration.make(
+            feedURL: Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+            publicKey: Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String
+        )
+        let updateController = UpdateController(configuration: updateConfiguration)
+
         let overlayPresenter = OverlayPresenter(
             animator: DefaultOverlayAnimator(speedStore: flightSpeedStore, skipOnClickStore: skipOnClickStore)
         )
@@ -53,13 +59,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             speedStore: flightSpeedStore,
             calendarSelectionStore: { UserDefaultsCalendarSelectionStore(accountId: $0) },
             skipOnClickStore: skipOnClickStore,
-            reminderSettingsStore: reminderSettingsStore
+            reminderSettingsStore: reminderSettingsStore,
+            updateController: updateController
         )
         self.statusMenuController = statusMenuController
 
         coordinator.onStateChange = { [weak statusMenuController] state in
             statusMenuController?.render(state)
         }
+
+        coordinator.setUpdateStatus(
+            updateController.isConfigured ? .configured(version: updateController.currentVersion) : .sourceBuild
+        )
 
         guard GoogleOAuthConfig.bundled != nil else {
             coordinator.setOAuthConfigured(false)

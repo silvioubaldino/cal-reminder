@@ -32,5 +32,11 @@
 	<string>$(GOOGLE_OAUTH_CLIENT_ID)</string>
 	<key>GoogleOAuthClientSecret</key>
 	<string>$(GOOGLE_OAUTH_CLIENT_SECRET)</string>
+	<key>SUFeedURL</key>
+	<string>$(SPARKLE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

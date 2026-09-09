@@ -1,8 +1,8 @@
 ---
 id: SPEC-020
 type: spec
-status: draft
-updated: 2026-09-08
+status: review
+updated: 2026-09-09
 parents: [AYD-009]
 related: [TDR-006, AYD-010, SPEC-018, SPEC-019, GLO, REQ-01]
 ---
@@ -120,10 +120,12 @@ Scenario: An update that does not verify is refused
 
 ## Affected files
 - `cal-reminder/Update/{UpdateController,UpdateSettings}.swift` (new)
-- `cal-reminder/App/{AppState,AppDelegate}.swift`, `cal-reminder/App/cal-reminder.entitlements`
-- `cal-reminder/MenuBar/StatusMenuController.swift`
-- `cal-reminderTests/{UpdateControllerTests,UpdateSettingsStoreTests}.swift` (new),
-  `cal-reminderTests/AppStateTests.swift`
+- `cal-reminder/App/{AppState,AppCoordinator,AppDelegate}.swift`, `cal-reminder/App/Info.plist`,
+  `cal-reminder/App/cal-reminder.entitlements`
+- `cal-reminder/MenuBar/{StatusMenuController,UpdateMenuBuilder}.swift` (`UpdateMenuBuilder` new,
+  mirroring `AccountsMenuBuilder`'s testable-builder shape)
+- `cal-reminderTests/{UpdateControllerTests,UpdateSettingsStoreTests}.swift` (new, the former also
+  covering `UpdateMenuBuilder`), `cal-reminderTests/AppStateTests.swift`
 - `project.yml`, `Config/Secrets.example.xcconfig`, `.swiftlint.yml`, `README.md`
 
 ## Tests
@@ -142,10 +144,10 @@ Scenario: An update that does not verify is refused
 
 ## Checklist
 - [ ] Sparkle 2 embedded, pinned, with its XPC services signed into the bundle
-- [ ] The two `mach-lookup` entitlements added; no other entitlement changed
+- [x] The two `mach-lookup` entitlements added; no other entitlement changed
 - [ ] Configured build: version row, working "Check for updates…", persisted "Check automatically"
-- [ ] Automatic checks off until the user opts in; no unprompted dialog on first launch
-- [ ] Source Build: "Updates: source build", no check item, no network request
-- [ ] User-initiated check comes to the front; a scheduled check never activates the app
+- [x] Automatic checks off until the user opts in; no unprompted dialog on first launch
+- [x] Source Build: "Updates: source build", no check item, no network request
+- [x] User-initiated check comes to the front; a scheduled check never activates the app
 - [ ] A mis-signed update is refused (manual verification against a staging feed)
 - [ ] An update installs end to end from a real Release and relaunches into the new version

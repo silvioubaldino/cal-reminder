@@ -16,6 +16,8 @@ final class StatusMenuController {
     private let calendarSelectionStore: (String) -> CalendarSelectionStoring
     private let skipOnClickStore: SkipOnClickStoring
     private let reminderSettingsStore: ReminderSettingsStoring
+    private let updateController: Updating
+    private var updateItems: [NSMenuItem] = []
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
     private var matchCalendarColorItem: NSMenuItem!
@@ -43,7 +45,8 @@ final class StatusMenuController {
         matchCalendarColorStore: MatchCalendarColorStoring = UserDefaultsMatchCalendarColorStore(),
         calendarSelectionStore: @escaping (String) -> CalendarSelectionStoring = { UserDefaultsCalendarSelectionStore(accountId: $0) },
         skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore(),
-        reminderSettingsStore: ReminderSettingsStoring = UserDefaultsReminderSettingsStore()
+        reminderSettingsStore: ReminderSettingsStoring = UserDefaultsReminderSettingsStore(),
+        updateController: Updating = UpdateController(configuration: nil)
     ) {
         self.onTestAnimation = onTestAnimation
         self.onToggleEnabled = onToggleEnabled
@@ -59,6 +62,7 @@ final class StatusMenuController {
         self.calendarSelectionStore = calendarSelectionStore
         self.skipOnClickStore = skipOnClickStore
         self.reminderSettingsStore = reminderSettingsStore
+        self.updateController = updateController
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "airplane",
@@ -140,6 +144,16 @@ final class StatusMenuController {
         accountsMenuItem = NSMenuItem(title: "Accounts", action: nil, keyEquivalent: "")
         accountsMenuItem.submenu = NSMenu()
         menu.addItem(accountsMenuItem)
+
+        menu.addItem(.separator())
+        updateItems = UpdateMenuBuilder.items(
+            for: updateController,
+            onCheckForUpdates: { [weak self] in self?.updateController.checkForUpdates() },
+            onToggleAutomaticChecks: { [weak self] in self?.handleToggleAutomaticChecks() }
+        )
+        for item in updateItems {
+            menu.addItem(item)
+        }
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
@@ -261,5 +275,11 @@ final class StatusMenuController {
         let newValue = !skipOnClickStore.skipOnClick
         skipOnClickStore.skipOnClick = newValue
         skipOnClickItem.state = newValue ? .on : .off
+    }
+
+    private func handleToggleAutomaticChecks() {
+        let newValue = !updateController.automaticallyChecks
+        updateController.automaticallyChecks = newValue
+        updateItems.last?.state = newValue ? .on : .off
     }
 }
