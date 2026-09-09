@@ -83,7 +83,8 @@ enum AccountsMenuBuilder {
     static func accountsMenu(
         for accounts: [AccountState],
         selectionStore: (String) -> CalendarSelectionStoring,
-        actions: AccountsMenuActions
+        actions: AccountsMenuActions,
+        oauthConfigured: Bool = true
     ) -> NSMenu {
         let menu = NSMenu()
 
@@ -94,7 +95,9 @@ enum AccountsMenuBuilder {
         if !accounts.isEmpty {
             menu.addItem(.separator())
         }
-        menu.addItem(actionItem(title: "Add Google account…", action: actions.onAddAccount))
+        let addAccountItem = actionItem(title: "Add Google account…", action: actions.onAddAccount)
+        addAccountItem.isEnabled = oauthConfigured
+        menu.addItem(addAccountItem)
 
         return menu
     }

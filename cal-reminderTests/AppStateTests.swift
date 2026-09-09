@@ -73,4 +73,19 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(state.statusTitle, "3 accounts · 2 need reconnecting")
     }
+
+    func test_statusTitle_oauthNotConfigured_noAccounts() {
+        var state = AppState()
+        state.oauthConfigured = false
+
+        XCTAssertEqual(state.statusTitle, "Setup needed — no Google client")
+    }
+
+    func test_statusTitle_oauthNotConfigured_winsOverConnectedAccounts() {
+        var state = AppState()
+        state.oauthConfigured = false
+        state.accounts = [account("google:a", label: "a@example.com", status: .connected)]
+
+        XCTAssertEqual(state.statusTitle, "Setup needed — no Google client")
+    }
 }

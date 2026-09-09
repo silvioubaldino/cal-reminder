@@ -1,8 +1,8 @@
 ---
 id: SPEC-018
 type: spec
-status: draft
-updated: 2026-09-08
+status: review
+updated: 2026-09-09
 parents: [AYD-009]
 related: [TDR-007, TDR-003, GLO, REQ-01, SPEC-002, SPEC-009]
 ---
@@ -168,12 +168,15 @@ Scenario: CI builds and tests without any credential
   rotated-away secret is not worth a job.
 
 ## Checklist
-- [ ] Old OAuth client rotated and deleted in Google Cloud (prerequisite)
-- [ ] No client id or secret in any tracked file; `Config/Secrets.xcconfig` gitignored
+- [ ] Old OAuth client rotated and deleted in Google Cloud (prerequisite — maintainer action,
+      outside this PR; do not merge to a public remote before this is done)
+- [x] No client id or secret in any tracked file; `Config/Secrets.xcconfig` gitignored
 - [ ] A clean clone builds and runs after `./scripts/bootstrap.sh`, with no credential
-- [ ] Unconfigured build states it in the menu, links the README, disables adding an Account, and
+      (needs a macOS CI run to confirm — implemented, not yet observed green)
+- [x] Unconfigured build states it in the menu, links the README, disables adding an Account, and
       makes no request to Google
-- [ ] Configured build connects, polls and refreshes exactly as before
-- [ ] `DEVELOPMENT_TEAM` no longer tracked; automatic signing still works on a fresh clone
-- [ ] CI green without any OAuth secret
-- [ ] README covers the Google client walkthrough and the publishing-status trap
+- [x] Configured build connects, polls and refreshes exactly as before (code path unchanged,
+      only the credential source moved)
+- [x] `DEVELOPMENT_TEAM` no longer tracked; automatic signing still works on a fresh clone
+- [ ] CI green without any OAuth secret (pending a run on the PR)
+- [x] README covers the Google client walkthrough and the publishing-status trap

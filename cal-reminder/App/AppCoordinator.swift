@@ -48,6 +48,14 @@ final class AppCoordinator {
         }
     }
 
+    /// Marks the app as missing a Google OAuth client (SPEC-018). Callers that set this to
+    /// `false` must not call `start()` — no session factory is safe to exercise without a
+    /// bundled `GoogleOAuthConfig`, so the Poll loop stays off rather than crashing on first tick.
+    func setOAuthConfigured(_ configured: Bool) {
+        state.oauthConfigured = configured
+        notify()
+    }
+
     func toggleEnabled() {
         state.enabled.toggle()
         let enabled = state.enabled

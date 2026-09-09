@@ -60,6 +60,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStateChange = { [weak statusMenuController] state in
             statusMenuController?.render(state)
         }
+
+        // No bundled OAuth client (SPEC-018): render the unconfigured state and stop here.
+        // Starting the Poll loop would eventually exercise a session factory that force-unwraps
+        // `GoogleOAuthConfig.bundled`, which is exactly what must never happen with no client.
+        guard GoogleOAuthConfig.bundled != nil else {
+            coordinator.setOAuthConfigured(false)
+            return
+        }
         coordinator.start()
     }
 
@@ -70,9 +78,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let scopedCalendarSelectionStore: (String) -> CalendarSelectionStoring = {
             UserDefaultsCalendarSelectionStore(accountId: $0)
         }
+        // Force-unwrapped: these factories only run once the Poll loop is started, and
+        // AppDelegate never starts it without a bundled config (see applicationDidFinishLaunching).
         let provisionalAuthFactory: (TokenStoring) -> AccountAuthenticating = { tokenStore in
             AuthManager(
-                config: .embedded,
+                config: GoogleOAuthConfig.bundled!,
                 tokenStore: tokenStore,
                 httpClient: URLSessionHTTPClient(),
                 authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
@@ -80,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let sessionFactory: (Account, TokenStoring, CalendarSelectionStoring) -> (auth: AccountAuthenticating, calendar: CalendarServicing) = { account, tokenStore, selectionStore in
             let auth = AuthManager(
-                config: .embedded,
+                config: GoogleOAuthConfig.bundled!,
                 tokenStore: tokenStore,
                 httpClient: URLSessionHTTPClient(),
                 authorizationCodeProvider: LoopbackAuthorizationCodeProvider()
