@@ -9,8 +9,12 @@
 # (never echoed) and writes them into the untracked Config/Secrets.xcconfig, so the
 # Distributed Build carries the project's own credentials (TDR-007).
 #
+# The Appcast feed URL and EdDSA public key come from the environment too: they are not
+# secret, but without them the Distributed Build ships with no update configuration and
+# Sparkle disables itself (AYD-009), so they are required rather than optional.
+#
 # Required environment: DEVELOPMENT_TEAM, CODE_SIGN_IDENTITY, GOOGLE_OAUTH_CLIENT_ID,
-# GOOGLE_OAUTH_CLIENT_SECRET.
+# GOOGLE_OAUTH_CLIENT_SECRET, SPARKLE_FEED_URL, SPARKLE_PUBLIC_ED_KEY.
 set -eu
 
 cd "$(dirname "$0")/../.."
@@ -18,13 +22,24 @@ cd "$(dirname "$0")/../.."
 VERSION="${1:?usage: build.sh <version> <build-number>}"
 BUILD_NUMBER="${2:?usage: build.sh <version> <build-number>}"
 
-for var in DEVELOPMENT_TEAM CODE_SIGN_IDENTITY GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET; do
+for var in DEVELOPMENT_TEAM CODE_SIGN_IDENTITY GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET \
+           SPARKLE_FEED_URL SPARKLE_PUBLIC_ED_KEY; do
   eval "value=\${$var:-}"
   if [ -z "$value" ]; then
     echo "build.sh: missing required environment variable $var" >&2
     exit 1
   fi
 done
+
+# An xcconfig treats "//" as a comment, which would truncate an https:// feed URL and can
+# also cut a base64 key short. Every "/" is written as $(SLASH) and expanded back by the
+# build-setting evaluator when it substitutes the value into Info.plist.
+escape_slashes() {
+  printf '%s' "$1" | sed 's|/|$(SLASH)|g'
+}
+
+FEED_URL_VALUE="$(escape_slashes "$SPARKLE_FEED_URL")"
+PUBLIC_ED_KEY_VALUE="$(escape_slashes "$SPARKLE_PUBLIC_ED_KEY")"
 
 BUILD_DIR="build"
 ARCHIVE_PATH="$BUILD_DIR/cal-reminder.xcarchive"
@@ -41,6 +56,9 @@ DEVELOPMENT_TEAM = $DEVELOPMENT_TEAM
 CODE_SIGN_IDENTITY = $CODE_SIGN_IDENTITY
 MARKETING_VERSION = $VERSION
 CURRENT_PROJECT_VERSION = $BUILD_NUMBER
+SLASH = /
+SPARKLE_FEED_URL = $FEED_URL_VALUE
+SPARKLE_PUBLIC_ED_KEY = $PUBLIC_ED_KEY_VALUE
 EOF
 
 xcodegen generate

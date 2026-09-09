@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fixed: a published Release was built without its update feed settings, leaving it unable to update anyone; the release now carries them and refuses to publish if they are missing.
 - Implemented SPEC-020: the app now checks for and installs updates on its own — a version row, a "Check for updates…" action, and a "Check automatically" toggle (off until the user opts in) in a Distributed Build; a Source Build states plainly that it has no updater and makes no request to any feed.
 - Implemented SPEC-019: pushing a version tag now builds, signs, notarizes and publishes the app as a downloadable disk image with a signed update feed, refusing to publish anything that fails verification.
 - Licensed the repository under PolyForm Shield 1.0.0: free to clone, build and use for any purpose, but not to redistribute as a competing product (RNF-12).

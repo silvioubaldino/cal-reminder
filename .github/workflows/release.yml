@@ -92,6 +92,10 @@ jobs:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          # Not secrets — the feed URL and the EdDSA public key are the update trust anchor
+          # the app ships publicly (AYD-009); they are repository variables.
+          SPARKLE_FEED_URL: ${{ vars.SPARKLE_FEED_URL }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
         run: scripts/release/build.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.build }}"
 
       - name: Notarize & staple the app

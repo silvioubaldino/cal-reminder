@@ -56,7 +56,19 @@ credential-free.
 
 None of these ever reaches the repository, a build log, or a Source Build.
 
-**Running the same steps locally** (with the secrets above exported as environment variables and
+**Repository variables** the workflow expects (Settings → Secrets and variables → Actions →
+Variables). These are deliberately *not* secrets — the app ships both of them in its `Info.plist`,
+and the public key is the update trust anchor anyone can inspect (RNF-11):
+
+| Variable | Purpose |
+|---|---|
+| `SPARKLE_FEED_URL` | `https://` URL the app reads the Appcast from, e.g. `https://silvioubaldino.github.io/cal-reminder/appcast.xml` |
+| `SPARKLE_PUBLIC_ED_KEY` | Base64 EdDSA public key matching `SPARKLE_ED_PRIVATE_KEY` |
+
+`verify.sh` refuses to publish a Release whose app carries neither, so a build that could never
+update anyone cannot reach a user.
+
+**Running the same steps locally** (with the secrets and variables above exported as environment variables and
 a Developer ID certificate in your login keychain):
 ```
 scripts/release/build.sh <version> <build-number>       # archive + export
