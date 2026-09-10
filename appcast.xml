@@ -1,5 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0"><channel><title>cal-reminder</title><item>
+            <title>0.2.0</title>
+            <pubDate>Thu, 10 Sep 2026 16:53:58 +0000</pubDate>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/silvioubaldino/cal-reminder/releases/download/v0.2.0/cal-reminder-0.2.0.dmg" length="1656659" type="application/octet-stream" sparkle:edSignature="mebKDX6thsszxAKRVg15yt0ysMqVH2eOWRcpwcBVo6uz+OzcwXO3B1yD9a3zn+WNGcpYfR5/L7ufuO8JT6mmBQ==" />
+        </item>
+    <item>
             <title>0.1.0</title>
             <pubDate>Thu, 10 Sep 2026 13:36:58 +0000</pubDate>
             <sparkle:version>33</sparkle:version>
