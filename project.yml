@@ -49,6 +49,59 @@ targets:
         ENABLE_HARDENED_RUNTIME: true
         CODE_SIGN_ENTITLEMENTS: cal-reminder/App/cal-reminder.entitlements
         GENERATE_INFOPLIST_FILE: false
+    postBuildScripts:
+      - name: Embed Sparkle's installer XPC service
+        basedOnDependencyAnalysis: false
+        script: |
+          # Under the App Sandbox, Sparkle's installer has to run out of process (AYD-010):
+          # the app declares the -spks/-spki mach-lookup exceptions, and the service backing
+          # them must live in the bundle. Swift Package Manager leaves it inside
+          # Sparkle.framework, so it never reaches Contents/XPCServices on its own — and an
+          # app missing it passes every signature check while failing every update with
+          # "An error occurred while launching the installer".
+          set -eu
+
+          contents="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}"
+
+          source_service=""
+          for candidate in \
+            "${contents}/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc" \
+            "${BUILT_PRODUCTS_DIR}/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc"
+          do
+            if [ -d "$candidate" ]; then
+              source_service="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$source_service" ]; then
+            source_service="$(find "${BUILD_DIR%/Build/*}" -type d -name Installer.xpc \
+              -path '*Sparkle.framework*' -print -quit 2>/dev/null || true)"
+          fi
+
+          if [ -z "$source_service" ] || [ ! -d "$source_service" ]; then
+            echo "error: Sparkle's Installer.xpc was not found — a sandboxed build cannot install updates" >&2
+            exit 1
+          fi
+
+          destination="${contents}/XPCServices"
+          mkdir -p "$destination"
+          rm -rf "${destination}/Installer.xpc"
+          cp -R "$source_service" "${destination}/Installer.xpc"
+
+          # Downloader.xpc is deliberately left out: the app already holds
+          # com.apple.security.network.client, and embedding it would make Sparkle route
+          # downloads through a mach name the entitlements do not grant.
+
+          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "YES" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
+            if [ "${CONFIGURATION}" = "Debug" ]; then
+              timestamp_flag="--timestamp=none"
+            else
+              timestamp_flag="--timestamp"
+            fi
+            codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
+              --options runtime "$timestamp_flag" "${destination}/Installer.xpc"
+          fi
 
   cal-reminderTests:
     type: bundle.unit-test

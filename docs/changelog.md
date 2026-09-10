@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
--
+- Fixed: an update was found and downloaded but never installed, failing at the last step — the app shipped without a helper its own security sandbox requires in order to run the installer; a release missing that helper can no longer be published.
 
 ## Release - v0.2.0 - 10-09-2026
 
