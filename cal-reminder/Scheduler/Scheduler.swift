@@ -2,25 +2,10 @@ import Foundation
 
 /// Arms a precise local timer per Trigger and fires `onFire` at `fireDate`, deduping by
 /// id (RN-03) and gating firing while paused (AYD-001 Scheduler contract).
-///
-/// The armed set is a **reconciliation** against the Poll's complete desired set (AYD-011),
-/// not an accumulation across Polls: `reconcile(_:authoritativeFor:)` arms what's new, re-arms
-/// what moved, and cancels what is missing from an Account the Poll actually heard back from —
-/// an Account whose Poll failed this round is left untouched, so its armed Triggers survive.
 protocol Scheduling: AnyObject {
-    /// Reconciles the armed set against `triggers`, the complete desired set derived from a
-    /// Poll. Only Triggers belonging to `accountIds` — the Accounts that Poll actually
-    /// succeeded for — are eligible to be cancelled when they're absent from `triggers`; an
-    /// armed Trigger for an Account outside that scope (its Poll failed, or it wasn't polled
-    /// this round) is left alone (RNF-04, RF-14).
     func reconcile(_ triggers: [Trigger], authoritativeFor accountIds: Set<String>) async
     func setEnabled(_ enabled: Bool) async
-    /// Cancels every armed Trigger for one Account without touching any other Account's
-    /// (RF-14) — used when that Account is signed out.
     func cancel(accountId: String) async
-    /// Re-arms every still-armed, not-yet-fired Trigger against the current clock, without
-    /// dropping any of them — used on wake from sleep (RNF-04), since `Task.sleep`'s clock
-    /// doesn't advance while the Mac is asleep.
     func rearmAll() async
 
     /// The not-yet-fired armed Trigger with the soonest `fireDate`, or `nil` if none is

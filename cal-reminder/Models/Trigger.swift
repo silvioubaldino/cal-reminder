@@ -13,9 +13,6 @@ struct Trigger: Identifiable, Equatable, Sendable {
     /// Poll that resolved it. Kept as a String, not an `NSColor`: the domain model stays
     /// free of AppKit. `nil` when the Calendar has no color, or for the test animation.
     let calendarColorHex: String?
-    /// The Account (GLO) this Trigger's Event came from — lets the Scheduler reconcile and
-    /// cancel Triggers scoped to one Account without a Poll failure elsewhere disarming it
-    /// (RF-14, RNF-04, AYD-011).
     let accountId: String
 
     init(

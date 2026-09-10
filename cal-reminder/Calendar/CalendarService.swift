@@ -12,19 +12,8 @@ extension CalendarServicing {
     }
 }
 
-/// Polls Google Calendar and derives Triggers from a local **replica** of each selected
-/// Calendar's Events, not from whichever response a given Poll happened to receive (AYD-011):
-/// an incremental delta only reports what changed (RNF-06), so a Poll's return value is only
-/// a complete, correct set of Triggers if it is built from the accumulated state, replica
-/// included with a Calendar that fetched successfully in some prior Poll but not this one.
 final class CalendarService: CalendarServicing {
-    /// How far ahead a full sync looks. Paired with `fullResyncInterval` below by AYD-011's
-    /// `W ≥ R + M` rule: 48 h comfortably covers the app's largest supported Reminder lead
-    /// time (RF-15's "1 day before" is 24 h) even at the staleest point of the resync cycle.
     private static let pollWindow: TimeInterval = 48 * 60 * 60
-    /// A syncToken's window is frozen at the moment it was minted — Google rejects sending
-    /// `timeMin`/`timeMax` alongside one — so without a periodic full sync it never slides
-    /// forward and an Event scheduled beyond it would never generate a Trigger (AYD-011).
     private static let fullResyncInterval: TimeInterval = 6 * 60 * 60
 
     private let api: GoogleCalendarAPIProtocol
@@ -35,8 +24,6 @@ final class CalendarService: CalendarServicing {
 
     private var syncTokens: [String: String] = [:]
     private var cachedDefaultReminders: [String: [GoogleCalendarDefaultReminder]] = [:]
-    /// Each selected Calendar's Events inside the current window, keyed by Calendar then
-    /// Event id — the source Triggers are derived from on every Poll (AYD-011).
     private var replica: [String: [String: GoogleEvent]] = [:]
     private var lastFullSync: Date?
 
@@ -67,9 +54,6 @@ final class CalendarService: CalendarServicing {
         let selectedIds = selectionStore.selectedCalendarIds?.intersection(allIds) ?? allIds
         print("[poll] \(calendars.count) available Calendars \(calendars.map(\.id)); stored selection=\(String(describing: selectionStore.selectedCalendarIds)); polling \(selectedIds)")
 
-        // A decision made once for the whole Poll, not per Calendar (AYD-011): dropping every
-        // stored syncToken here is what makes each Calendar's own fetch (below) a full sync —
-        // a Calendar that has never synced still gets one regardless of this flag.
         let mustFullSync = fullResync
             || (lastFullSync.map { now.timeIntervalSince($0) >= Self.fullResyncInterval } ?? true)
         if mustFullSync {
@@ -96,10 +80,6 @@ final class CalendarService: CalendarServicing {
         return deriveTriggers(selectedIds: selectedIds, colorsById: colorsById, reminderSettings: reminderSettings, now: now)
     }
 
-    /// Fetches one Calendar and applies the response to its replica: a full sync (no stored
-    /// syncToken) replaces the replica outright; an incremental one upserts changed Events and
-    /// removes cancelled ones. The replica is only touched **after** a successful fetch, so a
-    /// failure here leaves the previous replica — and Triggers derived from it — untouched.
     private func fetchAndApply(calendarId: String, windowEnd: Date, retryOnExpiredToken: Bool) async throws {
         let now = clock()
         let isFullSync = syncTokens[calendarId] == nil
@@ -144,10 +124,6 @@ final class CalendarService: CalendarServicing {
         }
     }
 
-    /// One pass over the replica of every selected Calendar → the complete desired set of
-    /// Triggers. Also prunes Events whose start has already passed, so the replica doesn't
-    /// grow without bound; an all-day Event (no `dateTime`) is skipped without being pruned,
-    /// matching RN-01 — the app has no reliable way to tell it's "past" from `date` alone.
     private func deriveTriggers(
         selectedIds: Set<String>,
         colorsById: [String: String?],

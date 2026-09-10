@@ -128,7 +128,6 @@ private func account(_ id: String, label: String) -> Account {
 
 private func trigger(id: String, minutesFromNow: TimeInterval = 5) -> Trigger {
     let start = Date().addingTimeInterval(minutesFromNow * 60)
-    // The id's own "<accountId>#..." prefix, matching how CalendarService actually builds it.
     let accountId = String(id.split(separator: "#", maxSplits: 1)[0])
     return Trigger(id: id, eventTitle: "Event", startDate: start, fireDate: start, minutesBefore: Int(minutesFromNow), accountId: accountId)
 }

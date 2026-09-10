@@ -21,11 +21,7 @@ struct GoogleEvent: Decodable {
 
     let id: String
     let summary: String?
-    /// Absent on a cancelled Event in an incremental delta (AYD-011): a `status: "cancelled"`
-    /// entry carries only `id` and `status`, no `start`.
     let start: EventDateTime?
-    /// `"confirmed"` | `"tentative"` | `"cancelled"`. A cancelled Event has no `start` and
-    /// must be removed from the replica rather than parsed (AYD-011).
     let status: String?
     let reminders: Reminders?
 }

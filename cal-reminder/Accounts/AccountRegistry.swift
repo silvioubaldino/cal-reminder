@@ -16,9 +16,6 @@ protocol AccountsManaging: AnyObject {
     func addAccount(provider: AccountProvider) async throws -> Account
     func reconnect(accountId: String) async throws
     func signOut(accountId: String) async
-    /// `authoritativeAccountIds` is every Account whose Poll returned without throwing this
-    /// round — the Scheduler may cancel a vanished Trigger only for an Account in that set
-    /// (RF-14, RNF-04, AYD-011): an Account whose Poll failed keeps its armed Triggers.
     func poll(fullResync: Bool) async -> (triggers: [Trigger], authoritativeAccountIds: Set<String>)
 }
 

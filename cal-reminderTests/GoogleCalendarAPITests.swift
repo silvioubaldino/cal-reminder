@@ -75,8 +75,6 @@ final class GoogleCalendarAPITests: XCTestCase {
     }
 
     func test_listEvents_decodesACancelledEntryWithNoStart() async throws {
-        // A cancelled Event in an incremental delta carries only `id` and `status`, no `start`
-        // (AYD-011) — decoding it must not throw.
         let auth = FakeAuthManaging()
         let json: [String: Any] = [
             "items": [

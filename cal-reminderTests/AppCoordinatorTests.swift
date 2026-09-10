@@ -4,8 +4,6 @@ import XCTest
 private final class FakeAccountsManaging: AccountsManaging {
     var sessions: [AccountSession] = []
     var pollTriggers: [Trigger] = []
-    /// Every Account this fake's next Poll succeeded for — defaults to none, so a test that
-    /// never sets it can't accidentally claim authority to cancel something (AYD-011).
     var pollAuthoritativeAccountIds: Set<String> = []
     var addAccountResult: Account?
     var addAccountError: Error?
@@ -164,11 +162,6 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     func test_nextTriggerSurvivesAPollWithNoChanges() async {
-        // A Poll that never claimed authority for "google:a" (the default here) can't cancel
-        // anything from it — the same conservative default that keeps a failed refresh's
-        // armed Triggers intact (`test_failedRefreshNowKeepsTheArmedTriggers`). A real,
-        // *authoritative* empty result is exactly what CalendarService's replica (AYD-011)
-        // now guarantees never happens for an Event that's still upcoming.
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
         accounts.pollTriggers = [upcoming]
@@ -221,8 +214,6 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     func test_wakeReArmsPendingTriggersBeforeRePolling() async {
-        // AYD-011: waking used to cancel every armed Trigger and hope the re-poll brought them
-        // all back; it now re-arms what's already known and only reconciles from there.
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
         accounts.pollTriggers = [upcoming]
@@ -321,7 +312,7 @@ final class AppCoordinatorTests: XCTestCase {
         await coordinator.poll()
 
         accounts.pollTriggers = []
-        accounts.pollAuthoritativeAccountIds = [] // this round's refresh failed for google:a
+        accounts.pollAuthoritativeAccountIds = []
         coordinator.refreshNow()
         try await Task.sleep(nanoseconds: 50_000_000)
 

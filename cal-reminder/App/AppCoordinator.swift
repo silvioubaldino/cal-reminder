@@ -107,9 +107,6 @@ final class AppCoordinator {
         Task { await overlay.enqueue(trigger) }
     }
 
-    /// A Poll's result is already the complete desired set for every Account it succeeded for
-    /// (AYD-011) — the Scheduler reconciles against it directly instead of being cancelled and
-    /// rebuilt, so an Account whose Poll failed this round keeps its previously armed Triggers.
     func poll(fullResync: Bool = false) async {
         let result = await accounts.poll(fullResync: fullResync)
         await scheduler.reconcile(result.triggers, authoritativeFor: result.authoritativeAccountIds)
@@ -119,10 +116,6 @@ final class AppCoordinator {
         notify()
     }
 
-    /// `Task.sleep`'s clock doesn't advance while the Mac is asleep, so an armed Trigger would
-    /// otherwise fire late (RNF-04): re-arm every one of them against the current clock first,
-    /// then re-sync — an incremental Poll here would report no changed Events and, under the
-    /// old cancel-then-poll flow, silently drop everything still pending.
     func handleWake() async {
         await scheduler.rearmAll()
         await poll()

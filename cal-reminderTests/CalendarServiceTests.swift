@@ -11,8 +11,6 @@ private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     var expireTokenOnce: Set<String> = []
     var alwaysFail: Set<String> = []
     var authRevokedFor: Set<String> = []
-    /// A FIFO queue of errors to throw the next N calls for a given Calendar, then resume
-    /// succeeding normally — models a transient per-Poll failure (RNF-04).
     var pendingFailures: [String: [Error]] = [:]
 
     private(set) var receivedCalendarIds: [String] = []
@@ -88,8 +86,6 @@ final class CalendarServiceTests: XCTestCase {
         )
     }
 
-    /// A cancelled Event as it arrives in an incremental delta (AYD-011): only `id` and
-    /// `status`, no `start`.
     private func cancelledEvent(id: String) -> GoogleEvent {
         GoogleEvent(id: id, summary: nil, start: nil, status: "cancelled", reminders: nil)
     }
@@ -228,8 +224,7 @@ final class CalendarServiceTests: XCTestCase {
     }
 
     func test_cancelledEventInDeltaDoesNotBreakPollAndSyncTokenIsStored() async throws {
-        // Arrange — SPEC-021 Slice 1: a cancelled Event in a delta carries no `start` and used
-        // to throw while decoding, stranding that Calendar's syncToken forever (AYD-011).
+        // Arrange
         let api = StubGoogleCalendarAPI()
         api.events["primary"] = [cancelledEvent(id: "evt-gone")]
         api.nextSyncTokens["primary"] = "token-after-delta"
@@ -244,8 +239,6 @@ final class CalendarServiceTests: XCTestCase {
         XCTAssertEqual(api.receivedSyncTokens, [nil, "token-after-delta"], "the syncToken from the response that carried the cancelled Event must still be stored")
     }
 
-    // MARK: - SPEC-021 Slice 2: the Event replica
-
     func test_eventSeenOnceKeepsGeneratingItsTriggerAcrossAnIncrementalPollWithNoChanges() async throws {
         // Arrange
         let api = StubGoogleCalendarAPI()
@@ -256,11 +249,11 @@ final class CalendarServiceTests: XCTestCase {
         let firstPoll = try await service.poll()
         XCTAssertEqual(firstPoll.map(\.id), ["acct1#primary#evt1#10"])
 
-        // Act — an incremental delta reporting no changes at all
+        // Act
         api.events["primary"] = []
         let secondPoll = try await service.poll()
 
-        // Assert — the Event is still known from the replica, not from this response
+        // Assert
         XCTAssertEqual(secondPoll.map(\.id), ["acct1#primary#evt1#10"])
     }
 
@@ -297,7 +290,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: secondStart)]
         let secondPoll = try await service.poll()
 
-        // Assert — one Trigger, for the new start time only
+        // Assert
         XCTAssertEqual(secondPoll.count, 1)
         XCTAssertEqual(secondPoll.first?.fireDate, secondStart.addingTimeInterval(-10 * 60))
     }
@@ -314,8 +307,7 @@ final class CalendarServiceTests: XCTestCase {
         let firstPoll = try await service.poll()
         XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#primary#evt-near#10"])
 
-        // Act — a far Event beyond the frozen syncToken window; an incremental Poll would
-        // never surface it, only a full sync widening the window does
+        // Act
         let farEvent = timedEvent(id: "evt-far", title: "Far", startDate: fixedNow.addingTimeInterval(47 * 60 * 60))
         api.events["primary"] = [nearEvent, farEvent]
         currentTime = fixedNow.addingTimeInterval(6 * 60 * 60 + 1)
@@ -341,11 +333,11 @@ final class CalendarServiceTests: XCTestCase {
         let firstPoll = try await service.poll()
         XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
 
-        // Act — only Calendar A fails this time
+        // Act
         api.pendingFailures["A"] = [URLError(.notConnectedToInternet)]
         let secondPoll = try await service.poll()
 
-        // Assert — both Calendars' Triggers are still in the result
+        // Assert
         XCTAssertEqual(Set(secondPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
     }
 
