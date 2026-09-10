@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -
 
+## Release - v0.2.1 - 10-09-2026
+
+- Fixed: an update was found and downloaded but never installed, failing at the last step — the app shipped without a helper its own security sandbox requires in order to run the installer; a release missing that helper can no longer be published.
+
 ## Release - v0.2.0 - 10-09-2026
 
 - Implemented SPEC-021: fixed three ways a reminder could go silently missing — an event scheduled beyond the app's sync window, everything still pending when the Mac woke or an account was signed out, and a single deleted event that quietly stopped a calendar from syncing at all.
