@@ -11,6 +11,7 @@ private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     var expireTokenOnce: Set<String> = []
     var alwaysFail: Set<String> = []
     var authRevokedFor: Set<String> = []
+    var pendingFailures: [String: [Error]] = [:]
 
     private(set) var receivedCalendarIds: [String] = []
     private(set) var receivedSyncTokens: [String?] = []
@@ -22,6 +23,11 @@ private final class StubGoogleCalendarAPI: GoogleCalendarAPIProtocol {
     func listEvents(calendarId: String, timeMin: Date, timeMax: Date, syncToken: String?) async throws -> (events: [GoogleEvent], nextSyncToken: String?, defaultReminders: [GoogleCalendarDefaultReminder]?) {
         receivedCalendarIds.append(calendarId)
         receivedSyncTokens.append(syncToken)
+        if var queued = pendingFailures[calendarId], !queued.isEmpty {
+            let error = queued.removeFirst()
+            pendingFailures[calendarId] = queued
+            throw error
+        }
         if authRevokedFor.contains(calendarId) {
             throw AuthError.refreshTokenRevoked
         }
@@ -65,6 +71,7 @@ final class CalendarServiceTests: XCTestCase {
             id: id,
             summary: title,
             start: .init(dateTime: formatter.string(from: startDate), date: nil),
+            status: "confirmed",
             reminders: .init(useDefault: useDefault, overrides: overrides)
         )
     }
@@ -74,8 +81,13 @@ final class CalendarServiceTests: XCTestCase {
             id: id,
             summary: "Holiday",
             start: .init(dateTime: nil, date: "2027-01-16"),
+            status: "confirmed",
             reminders: nil
         )
+    }
+
+    private func cancelledEvent(id: String) -> GoogleEvent {
+        GoogleEvent(id: id, summary: nil, start: nil, status: "cancelled", reminders: nil)
     }
 
     func test_onlyTimedEventsProduceTriggers() async throws {
@@ -209,6 +221,148 @@ final class CalendarServiceTests: XCTestCase {
         _ = try await service.poll()
 
         XCTAssertEqual(api.receivedSyncTokens, [nil, nil, "token-abc"])
+    }
+
+    func test_cancelledEventInDeltaDoesNotBreakPollAndSyncTokenIsStored() async throws {
+        // Arrange
+        let api = StubGoogleCalendarAPI()
+        api.events["primary"] = [cancelledEvent(id: "evt-gone")]
+        api.nextSyncTokens["primary"] = "token-after-delta"
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+
+        // Act
+        let triggers = try await service.poll()
+
+        // Assert
+        XCTAssertTrue(triggers.isEmpty)
+        _ = try await service.poll()
+        XCTAssertEqual(api.receivedSyncTokens, [nil, "token-after-delta"], "the syncToken from the response that carried the cancelled Event must still be stored")
+    }
+
+    func test_eventSeenOnceKeepsGeneratingItsTriggerAcrossAnIncrementalPollWithNoChanges() async throws {
+        // Arrange
+        let api = StubGoogleCalendarAPI()
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(3600))]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.nextSyncTokens["primary"] = "token-1"
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let firstPoll = try await service.poll()
+        XCTAssertEqual(firstPoll.map(\.id), ["acct1#primary#evt1#10"])
+
+        // Act
+        api.events["primary"] = []
+        let secondPoll = try await service.poll()
+
+        // Assert
+        XCTAssertEqual(secondPoll.map(\.id), ["acct1#primary#evt1#10"])
+    }
+
+    func test_cancelledEventInIncrementalDeltaDropsOutOfTheReplica() async throws {
+        // Arrange
+        let api = StubGoogleCalendarAPI()
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(3600))]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.nextSyncTokens["primary"] = "token-1"
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let firstPoll = try await service.poll()
+        XCTAssertEqual(firstPoll.map(\.id), ["acct1#primary#evt1#10"])
+
+        // Act
+        api.events["primary"] = [cancelledEvent(id: "evt1")]
+        let secondPoll = try await service.poll()
+
+        // Assert
+        XCTAssertTrue(secondPoll.isEmpty)
+    }
+
+    func test_changedEventInIncrementalDeltaReplacesItsPreviousVersion() async throws {
+        // Arrange
+        let api = StubGoogleCalendarAPI()
+        let firstStart = fixedNow.addingTimeInterval(3600)
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: firstStart)]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.nextSyncTokens["primary"] = "token-1"
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        _ = try await service.poll()
+
+        // Act
+        let secondStart = firstStart.addingTimeInterval(3600)
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: secondStart)]
+        let secondPoll = try await service.poll()
+
+        // Assert
+        XCTAssertEqual(secondPoll.count, 1)
+        XCTAssertEqual(secondPoll.first?.fireDate, secondStart.addingTimeInterval(-10 * 60))
+    }
+
+    func test_windowAdvancesToAFullSyncAfterTheResyncInterval() async throws {
+        // Arrange
+        var currentTime = fixedNow
+        let api = StubGoogleCalendarAPI()
+        let nearEvent = timedEvent(id: "evt-near", title: "Near", startDate: fixedNow.addingTimeInterval(600))
+        api.events["primary"] = [nearEvent]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.nextSyncTokens["primary"] = "token-1"
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { currentTime })
+        let firstPoll = try await service.poll()
+        XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#primary#evt-near#10"])
+
+        // Act
+        let farEvent = timedEvent(id: "evt-far", title: "Far", startDate: fixedNow.addingTimeInterval(47 * 60 * 60))
+        api.events["primary"] = [nearEvent, farEvent]
+        currentTime = fixedNow.addingTimeInterval(6 * 60 * 60 + 1)
+        let secondPoll = try await service.poll()
+
+        // Assert
+        XCTAssertNil(api.receivedSyncTokens.last!, "past the resync interval, the Calendar must be fetched without its syncToken")
+        XCTAssertTrue(secondPoll.contains { $0.id == "acct1#primary#evt-far#10" })
+    }
+
+    func test_calendarWhoseFetchFailsKeepsItsPreviouslyKnownTriggers() async throws {
+        // Arrange
+        let api = StubGoogleCalendarAPI()
+        api.calendars = [
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
+        ]
+        api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
+        api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
+        api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let firstPoll = try await service.poll()
+        XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
+
+        // Act
+        api.pendingFailures["A"] = [URLError(.notConnectedToInternet)]
+        let secondPoll = try await service.poll()
+
+        // Assert
+        XCTAssertEqual(Set(secondPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
+    }
+
+    func test_deselectedCalendarsTriggersDisappearFromThePollResult() async throws {
+        // Arrange
+        let api = StubGoogleCalendarAPI()
+        api.calendars = [
+            GoogleCalendarListEntry(id: "A", summary: "A", primary: true, accessRole: "owner", backgroundColor: nil),
+            GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
+        ]
+        api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
+        api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
+        api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        let selectionStore = StubCalendarSelectionStore(selectedCalendarIds: nil)
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: selectionStore, reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let firstPoll = try await service.poll()
+        XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
+
+        // Act
+        selectionStore.selectedCalendarIds = ["A"]
+        let secondPoll = try await service.poll()
+
+        // Assert
+        XCTAssertEqual(secondPoll.map(\.id), ["acct1#A#evt-a#10"])
     }
 
     func test_fullResyncKeepsTheCachedDefaultReminders() async throws {

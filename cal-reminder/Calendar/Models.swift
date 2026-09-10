@@ -21,7 +21,8 @@ struct GoogleEvent: Decodable {
 
     let id: String
     let summary: String?
-    let start: EventDateTime
+    let start: EventDateTime?
+    let status: String?
     let reminders: Reminders?
 }
 

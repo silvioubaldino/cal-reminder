@@ -82,7 +82,7 @@ final class AppCoordinator {
     func signOut(accountId: String) {
         Task {
             await accounts.signOut(accountId: accountId)
-            await scheduler.cancelAll()
+            await scheduler.cancel(accountId: accountId)
             await poll()
         }
     }
@@ -101,17 +101,15 @@ final class AppCoordinator {
             eventTitle: "Standup",
             startDate: now.addingTimeInterval(5 * 60),
             fireDate: now,
-            minutesBefore: 5
+            minutesBefore: 5,
+            accountId: "test"
         )
         Task { await overlay.enqueue(trigger) }
     }
 
     func poll(fullResync: Bool = false) async {
         let result = await accounts.poll(fullResync: fullResync)
-        if fullResync && result.anyAccountSucceeded {
-            await scheduler.cancelAll()
-        }
-        await scheduler.schedule(result.triggers)
+        await scheduler.reconcile(result.triggers, authoritativeFor: result.authoritativeAccountIds)
         syncAccountsState()
         state.nextTrigger = await scheduler.nextArmedTrigger()
         state.refreshing = false
@@ -119,27 +117,24 @@ final class AppCoordinator {
     }
 
     func handleWake() async {
-        await scheduler.cancelAll()
+        await scheduler.rearmAll()
         await poll()
     }
 
-    /// The Calendar selection changed (RF-10): drop the armed Triggers and rebuild them from a
-    /// **full resync** — same reason as `remindersChanged()`. The Calendars that stayed selected
-    /// still hold a `syncToken`, so an incremental Poll would report no Events for them and
-    /// leave their upcoming Triggers cancelled and never re-armed.
+    /// The Calendar selection changed (RF-10): rebuild the Triggers from a **full resync** —
+    /// same reason as `remindersChanged()`. `poll(fullResync:)`'s reconcile already drops a
+    /// deselected Calendar's Triggers, since they're simply absent from the fresh result.
     func calendarsChanged() {
         Task {
-            await scheduler.cancelAll()
             await poll(fullResync: true)
         }
     }
 
-    /// The Reminder selection changed (RF-15): drop the armed Triggers and rebuild them from a
-    /// **full resync**. An incremental Poll would return only changed Events (RNF-06), leaving
-    /// the upcoming Triggers cancelled and never re-armed.
+    /// The Reminder selection changed (RF-15): rebuild the Triggers from a **full resync**. An
+    /// incremental Poll would return only changed Events (RNF-06), which the reconcile would
+    /// wrongly read as "everything else is gone".
     func remindersChanged() {
         Task {
-            await scheduler.cancelAll()
             await poll(fullResync: true)
         }
     }

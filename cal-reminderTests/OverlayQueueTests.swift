@@ -28,7 +28,8 @@ final class OverlayQueueTests: XCTestCase {
             startDate: Date(),
             fireDate: Date(),
             minutesBefore: 5,
-            calendarColorHex: calendarColorHex
+            calendarColorHex: calendarColorHex,
+            accountId: "acct1"
         )
     }
 

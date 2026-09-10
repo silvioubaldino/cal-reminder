@@ -4,7 +4,7 @@ import XCTest
 private final class FakeAccountsManaging: AccountsManaging {
     var sessions: [AccountSession] = []
     var pollTriggers: [Trigger] = []
-    var pollAnyAccountSucceeded = true
+    var pollAuthoritativeAccountIds: Set<String> = []
     var addAccountResult: Account?
     var addAccountError: Error?
     var reconnectError: Error?
@@ -46,23 +46,31 @@ private final class FakeAccountsManaging: AccountsManaging {
         sessions.removeAll { $0.id == accountId }
     }
 
-    func poll(fullResync: Bool) async -> (triggers: [Trigger], anyAccountSucceeded: Bool) {
+    func poll(fullResync: Bool) async -> (triggers: [Trigger], authoritativeAccountIds: Set<String>) {
         pollCallCount += 1
         receivedFullResyncFlags.append(fullResync)
-        return (pollTriggers, pollAnyAccountSucceeded)
+        return (pollTriggers, pollAuthoritativeAccountIds)
     }
 }
 
 private final class FakeScheduler: Scheduling {
-    private(set) var scheduledTriggers: [[Trigger]] = []
+    private(set) var reconcileCalls: [(triggers: [Trigger], accountIds: Set<String>)] = []
     private(set) var enabledCalls: [Bool] = []
-    private(set) var cancelAllCallCount = 0
+    private(set) var cancelledAccountIds: [String] = []
+    private(set) var rearmAllCallCount = 0
     private var armed: [String: Trigger] = [:]
 
-    func schedule(_ triggers: [Trigger]) async {
-        scheduledTriggers.append(triggers)
+    func reconcile(_ triggers: [Trigger], authoritativeFor accountIds: Set<String>) async {
+        reconcileCalls.append((triggers, accountIds))
         for trigger in triggers {
             armed[trigger.id] = trigger
+        }
+        let incomingIds = Set(triggers.map(\.id))
+        let vanishedIds = armed.values
+            .filter { accountIds.contains($0.accountId) && !incomingIds.contains($0.id) }
+            .map(\.id)
+        for id in vanishedIds {
+            armed.removeValue(forKey: id)
         }
     }
 
@@ -70,9 +78,16 @@ private final class FakeScheduler: Scheduling {
         enabledCalls.append(enabled)
     }
 
-    func cancelAll() async {
-        cancelAllCallCount += 1
-        armed.removeAll()
+    func cancel(accountId: String) async {
+        cancelledAccountIds.append(accountId)
+        let ids = armed.values.filter { $0.accountId == accountId }.map(\.id)
+        for id in ids {
+            armed.removeValue(forKey: id)
+        }
+    }
+
+    func rearmAll() async {
+        rearmAllCallCount += 1
     }
 
     func nextArmedTrigger() async -> Trigger? {
@@ -86,9 +101,9 @@ private actor NoOpAnimator: OverlayAnimating {
 
 @MainActor
 final class AppCoordinatorTests: XCTestCase {
-    private func trigger(id: String, minutesFromNow: TimeInterval) -> Trigger {
+    private func trigger(id: String, minutesFromNow: TimeInterval, accountId: String = "google:a") -> Trigger {
         let start = Date().addingTimeInterval(minutesFromNow * 60)
-        return Trigger(id: id, eventTitle: "Standup", startDate: start, fireDate: start, minutesBefore: 0)
+        return Trigger(id: id, eventTitle: "Standup", startDate: start, fireDate: start, minutesBefore: 0, accountId: accountId)
     }
 
     private func account(_ id: String = "google:a", label: String = "a@example.com") -> Account {
@@ -143,7 +158,7 @@ final class AppCoordinatorTests: XCTestCase {
         await coordinator.poll()
 
         XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
-        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+        XCTAssertEqual(scheduler.reconcileCalls.last?.triggers.map(\.id), ["evt1#5"])
     }
 
     func test_nextTriggerSurvivesAPollWithNoChanges() async {
@@ -198,7 +213,7 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(accounts.pollCallCount, 1)
     }
 
-    func test_wakeCancelsSchedulerBeforeRePolling() async {
+    func test_wakeReArmsPendingTriggersBeforeRePolling() async {
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
         accounts.pollTriggers = [upcoming]
@@ -207,11 +222,11 @@ final class AppCoordinatorTests: XCTestCase {
 
         await coordinator.handleWake()
 
-        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
-        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+        XCTAssertEqual(scheduler.rearmAllCallCount, 1)
+        XCTAssertEqual(scheduler.reconcileCalls.last?.triggers.map(\.id), ["evt1#5"])
     }
 
-    func test_calendarsChangedCancelsSchedulerAndRePolls() async throws {
+    func test_calendarsChangedRebuildsTriggersWithAFullResync() async throws {
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)
         accounts.pollTriggers = [upcoming]
@@ -221,19 +236,17 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.calendarsChanged()
         try await Task.sleep(nanoseconds: 50_000_000)
 
-        XCTAssertGreaterThanOrEqual(scheduler.cancelAllCallCount, 1)
         XCTAssertEqual(accounts.pollCallCount, 1)
-        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#5"])
+        XCTAssertEqual(scheduler.reconcileCalls.last?.triggers.map(\.id), ["evt1#5"])
         XCTAssertEqual(
             accounts.receivedFullResyncFlags,
             [true],
-            "an incremental Poll would report no Events for the Calendars that kept their syncToken, losing their armed Triggers"
+            "a newly selected Calendar has no syncToken yet, so only a full resync picks it up right away"
         )
     }
 
-    func test_remindersChangedCancelsSchedulerAndRebuildsTriggersWithAFullResync() async throws {
-        // Arrange — a Reminder-selection change (RF-15) must not wait for the next Poll, and
-        // an incremental one would return no Events (AYD-008)
+    func test_remindersChangedRebuildsTriggersWithAFullResync() async throws {
+        // Arrange — a Reminder-selection change (RF-15) must not wait for the next Poll
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#1", minutesFromNow: 5)
         accounts.pollTriggers = [upcoming]
@@ -245,9 +258,8 @@ final class AppCoordinatorTests: XCTestCase {
         try await Task.sleep(nanoseconds: 50_000_000)
 
         // Assert
-        XCTAssertGreaterThanOrEqual(scheduler.cancelAllCallCount, 1)
         XCTAssertEqual(accounts.receivedFullResyncFlags, [true])
-        XCTAssertEqual(scheduler.scheduledTriggers.last?.map(\.id), ["evt1#1"])
+        XCTAssertEqual(scheduler.reconcileCalls.last?.triggers.map(\.id), ["evt1#1"])
     }
 
     func test_refreshNowTriggersPollAndTogglesRefreshingFlag() async throws {
@@ -277,6 +289,7 @@ final class AppCoordinatorTests: XCTestCase {
     func test_refreshNowRebuildsTheArmedSetDroppingVanishedTriggers() async throws {
         let accounts = FakeAccountsManaging()
         accounts.pollTriggers = [trigger(id: "evt1#5", minutesFromNow: 5)]
+        accounts.pollAuthoritativeAccountIds = ["google:a"]
         let scheduler = FakeScheduler()
         let coordinator = makeCoordinator(accounts: accounts, scheduler: scheduler)
         await coordinator.poll()
@@ -286,27 +299,28 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.refreshNow()
         try await Task.sleep(nanoseconds: 50_000_000)
 
-        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(scheduler.reconcileCalls.last?.accountIds, ["google:a"])
         XCTAssertNil(coordinator.state.nextTrigger)
     }
 
     func test_failedRefreshNowKeepsTheArmedTriggers() async throws {
         let accounts = FakeAccountsManaging()
         accounts.pollTriggers = [trigger(id: "evt1#5", minutesFromNow: 5)]
+        accounts.pollAuthoritativeAccountIds = ["google:a"]
         let scheduler = FakeScheduler()
         let coordinator = makeCoordinator(accounts: accounts, scheduler: scheduler)
         await coordinator.poll()
 
         accounts.pollTriggers = []
-        accounts.pollAnyAccountSucceeded = false
+        accounts.pollAuthoritativeAccountIds = []
         coordinator.refreshNow()
         try await Task.sleep(nanoseconds: 50_000_000)
 
-        XCTAssertEqual(scheduler.cancelAllCallCount, 0)
+        XCTAssertEqual(scheduler.reconcileCalls.last?.accountIds, [])
         XCTAssertEqual(coordinator.state.nextTrigger?.id, "evt1#5")
     }
 
-    func test_signOutCancelsSchedulerAndDropsTheAccountFromState() async throws {
+    func test_signOutCancelsOnlyThatAccountsTriggersAndDropsItFromState() async throws {
         let accounts = FakeAccountsManaging()
         accounts.sessions = [AccountSession(account: account(), connectionStatus: .connected)]
         accounts.pollTriggers = [trigger(id: "evt1#5", minutesFromNow: 5)]
@@ -320,7 +334,7 @@ final class AppCoordinatorTests: XCTestCase {
         try await Task.sleep(nanoseconds: 50_000_000)
 
         XCTAssertEqual(accounts.signOutCalls, ["google:a"])
-        XCTAssertEqual(scheduler.cancelAllCallCount, 1)
+        XCTAssertEqual(scheduler.cancelledAccountIds, ["google:a"])
         XCTAssertNil(coordinator.state.nextTrigger)
         XCTAssertTrue(coordinator.state.accounts.isEmpty)
     }

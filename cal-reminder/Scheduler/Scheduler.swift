@@ -3,13 +3,13 @@ import Foundation
 /// Arms a precise local timer per Trigger and fires `onFire` at `fireDate`, deduping by
 /// id (RN-03) and gating firing while paused (AYD-001 Scheduler contract).
 protocol Scheduling: AnyObject {
-    func schedule(_ triggers: [Trigger]) async
+    func reconcile(_ triggers: [Trigger], authoritativeFor accountIds: Set<String>) async
     func setEnabled(_ enabled: Bool) async
-    func cancelAll() async
+    func cancel(accountId: String) async
+    func rearmAll() async
 
     /// The not-yet-fired armed Trigger with the soonest `fireDate`, or `nil` if none is
-    /// armed. Reflects the accumulated set across every `schedule(_:)` call so far — not
-    /// just the last one — since incremental Polls (RNF-06) only report changed Events.
+    /// armed.
     func nextArmedTrigger() async -> Trigger?
 }
 
@@ -32,16 +32,22 @@ actor Scheduler: Scheduling {
         self.onFire = onFire
     }
 
-    /// (Re)arms every Trigger not already fired; drops past-due ones silently (this is what
-    /// prunes stale Triggers after a sleep/wake re-poll, RNF-04) and re-arms any whose
-    /// `fireDate` changed since it was last armed.
-    func schedule(_ triggers: [Trigger]) {
+    func reconcile(_ triggers: [Trigger], authoritativeFor accountIds: Set<String>) {
         for trigger in triggers {
             guard !firedIds.contains(trigger.id) else { continue }
             guard trigger.fireDate > clock() else { continue }
             if let existing = armed[trigger.id], existing.fireDate == trigger.fireDate { continue }
             armed[trigger.id]?.task.cancel()
             arm(trigger)
+        }
+
+        let incomingIds = Set(triggers.map(\.id))
+        let vanishedIds = armed.values
+            .filter { accountIds.contains($0.trigger.accountId) && !incomingIds.contains($0.trigger.id) }
+            .map(\.trigger.id)
+        for id in vanishedIds {
+            armed[id]?.task.cancel()
+            armed.removeValue(forKey: id)
         }
     }
 
@@ -51,11 +57,26 @@ actor Scheduler: Scheduling {
         self.enabled = enabled
     }
 
-    func cancelAll() {
+    func cancel(accountId: String) {
+        let ids = armed.values.filter { $0.trigger.accountId == accountId }.map(\.trigger.id)
+        for id in ids {
+            armed[id]?.task.cancel()
+            armed.removeValue(forKey: id)
+        }
+    }
+
+    func rearmAll() {
+        let triggers = armed.values.map(\.trigger)
         for entry in armed.values {
             entry.task.cancel()
         }
         armed.removeAll()
+
+        for trigger in triggers {
+            guard !firedIds.contains(trigger.id) else { continue }
+            guard trigger.fireDate > clock() else { continue }
+            arm(trigger)
+        }
     }
 
     func nextArmedTrigger() -> Trigger? {

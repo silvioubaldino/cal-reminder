@@ -3,9 +3,9 @@ id: REQ-01
 type: requirements
 title: Requirements and glossary
 status: approved
-updated: 2026-09-09
+updated: 2026-09-10
 parents: []
-children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010]
+children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010, AYD-011]
 related: [GLO]
 ---
 
@@ -45,7 +45,7 @@ related: [GLO]
 | RNF-01 | Footprint | Runs as a background menu bar agent | `LSUIElement` app, no Dock icon |
 | RNF-02 | Overlay behavior | The Overlay never steals focus, and appears above everything; it is click-through except while a Reminder animation is playing, when a click skips it (RF-09) | Shows over fullscreen apps and all Spaces; clicks pass through to the window below when idle; never activates the app or takes key focus, even mid-flight |
 | RNF-03 | Precision | The Trigger fires close to the computed time | Error < 5 s from the computed fire time |
-| RNF-04 | Resilience | Tolerant to sleep/wake and network loss | Re-syncs on wake; keeps scheduled Triggers across transient network failures |
+| RNF-04 | Resilience | Tolerant to sleep/wake and network loss | Waking re-arms already-scheduled Triggers against the current clock instead of dropping them, then re-syncs (AYD-011); a Poll failure — transient network loss, or one Account's own outage (RF-14) — never cancels a Trigger it isn't authoritative for |
 | RNF-05 | Security | The **user's** secrets are stored securely | Each connected Account's OAuth access/refresh tokens live only in the macOS Keychain, keyed separately per Account, never in plaintext on disk |
 | RNF-06 | Network | Efficient calendar sync | Incremental poll using `syncToken` |
 | RNF-07 | Distribution | Distributed **directly**, outside the Mac App Store | Signed with a Developer ID certificate, notarized and stapled, shipped as a `.dmg` from a public landing page and as a Homebrew Cask; Gatekeeper opens it on a clean machine with no warning and no right-click-to-open workaround. The Mac App Store is **explicitly out of scope** — with it go App Review, the demo-account requirement and the store's update mechanism (AYD-009, which supersedes AYD-003) |
