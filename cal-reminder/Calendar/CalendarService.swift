@@ -112,8 +112,9 @@ final class CalendarService: CalendarServicing {
         let defaults = cachedDefaultReminders[calendarId] ?? []
 
         return events.flatMap { event -> [Trigger] in
-            guard let startDate = Self.parseDate(event.start.dateTime) else {
-                print("[poll] skip '\(event.summary ?? "")' — no dateTime (all-day?) start=\(String(describing: event.start.dateTime))")
+            guard event.status != "cancelled" else { return [] }
+            guard let startDate = Self.parseDate(event.start?.dateTime) else {
+                print("[poll] skip '\(event.summary ?? "")' — no dateTime (all-day?) start=\(String(describing: event.start?.dateTime))")
                 return []
             }
 

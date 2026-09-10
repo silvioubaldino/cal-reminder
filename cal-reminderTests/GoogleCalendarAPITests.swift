@@ -74,6 +74,27 @@ final class GoogleCalendarAPITests: XCTestCase {
         XCTAssertTrue(path.contains("calendars/team@group.calendar.google.com/events"), path)
     }
 
+    func test_listEvents_decodesACancelledEntryWithNoStart() async throws {
+        // A cancelled Event in an incremental delta carries only `id` and `status`, no `start`
+        // (AYD-011) — decoding it must not throw.
+        let auth = FakeAuthManaging()
+        let json: [String: Any] = [
+            "items": [
+                ["id": "evt-gone", "status": "cancelled"]
+            ],
+            "nextSyncToken": "token-after-delta"
+        ]
+        auth.response = (try! JSONSerialization.data(withJSONObject: json), httpResponse(status: 200))
+        let api = GoogleCalendarAPI(authManager: auth)
+
+        let result = try await api.listEvents(calendarId: "primary", timeMin: Date(), timeMax: Date(), syncToken: "stale-token")
+
+        XCTAssertEqual(result.events.first?.id, "evt-gone")
+        XCTAssertEqual(result.events.first?.status, "cancelled")
+        XCTAssertNil(result.events.first?.start)
+        XCTAssertEqual(result.nextSyncToken, "token-after-delta")
+    }
+
     func test_listEvents_throwsUnexpectedStatusOnNon200() async {
         let auth = FakeAuthManaging()
         auth.response = (Data(), httpResponse(status: 410))

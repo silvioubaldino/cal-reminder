@@ -65,6 +65,7 @@ final class CalendarServiceTests: XCTestCase {
             id: id,
             summary: title,
             start: .init(dateTime: formatter.string(from: startDate), date: nil),
+            status: "confirmed",
             reminders: .init(useDefault: useDefault, overrides: overrides)
         )
     }
@@ -74,8 +75,15 @@ final class CalendarServiceTests: XCTestCase {
             id: id,
             summary: "Holiday",
             start: .init(dateTime: nil, date: "2027-01-16"),
+            status: "confirmed",
             reminders: nil
         )
+    }
+
+    /// A cancelled Event as it arrives in an incremental delta (AYD-011): only `id` and
+    /// `status`, no `start`.
+    private func cancelledEvent(id: String) -> GoogleEvent {
+        GoogleEvent(id: id, summary: nil, start: nil, status: "cancelled", reminders: nil)
     }
 
     func test_onlyTimedEventsProduceTriggers() async throws {
@@ -209,6 +217,23 @@ final class CalendarServiceTests: XCTestCase {
         _ = try await service.poll()
 
         XCTAssertEqual(api.receivedSyncTokens, [nil, nil, "token-abc"])
+    }
+
+    func test_cancelledEventInDeltaDoesNotBreakPollAndSyncTokenIsStored() async throws {
+        // Arrange — SPEC-021 Slice 1: a cancelled Event in a delta carries no `start` and used
+        // to throw while decoding, stranding that Calendar's syncToken forever (AYD-011).
+        let api = StubGoogleCalendarAPI()
+        api.events["primary"] = [cancelledEvent(id: "evt-gone")]
+        api.nextSyncTokens["primary"] = "token-after-delta"
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+
+        // Act
+        let triggers = try await service.poll()
+
+        // Assert
+        XCTAssertTrue(triggers.isEmpty)
+        _ = try await service.poll()
+        XCTAssertEqual(api.receivedSyncTokens, [nil, "token-after-delta"], "the syncToken from the response that carried the cancelled Event must still be stored")
     }
 
     func test_fullResyncKeepsTheCachedDefaultReminders() async throws {

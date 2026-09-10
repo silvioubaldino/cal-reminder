@@ -10,6 +10,7 @@ final class ReminderResolverTests: XCTestCase {
             id: "evt1",
             summary: "Standup",
             start: .init(dateTime: "2026-07-11T14:00:00-03:00", date: nil),
+            status: "confirmed",
             reminders: .init(useDefault: useDefault, overrides: overrides)
         )
     }
@@ -54,6 +55,7 @@ final class ReminderResolverTests: XCTestCase {
             id: "evt1",
             summary: "Standup",
             start: .init(dateTime: "2026-07-11T14:00:00-03:00", date: nil),
+            status: "confirmed",
             reminders: nil
         )
         let defaults = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
