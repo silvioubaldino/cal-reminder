@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -
 
+## Release - v0.2.2 - 10-09-2026
+
+- Fixed: the app opened saying it could not check for updates at all — the previous release shipped the update helper in the wrong place, which stops the updater before it starts; a release that misplaces it can no longer be published.
+
 ## Release - v0.2.1 - 10-09-2026
 
 - Fixed: an update was found and downloaded but never installed, failing at the last step — the app shipped without a helper its own security sandbox requires in order to run the installer; a release missing that helper can no longer be published.
