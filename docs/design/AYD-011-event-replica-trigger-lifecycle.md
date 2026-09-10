@@ -1,7 +1,7 @@
 ---
 id: AYD-011
 type: design
-status: draft
+status: approved
 updated: 2026-09-10
 parents: [REQ-01]
 children: [SPEC-021]

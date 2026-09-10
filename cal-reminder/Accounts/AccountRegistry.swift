@@ -16,7 +16,10 @@ protocol AccountsManaging: AnyObject {
     func addAccount(provider: AccountProvider) async throws -> Account
     func reconnect(accountId: String) async throws
     func signOut(accountId: String) async
-    func poll(fullResync: Bool) async -> (triggers: [Trigger], anyAccountSucceeded: Bool)
+    /// `authoritativeAccountIds` is every Account whose Poll returned without throwing this
+    /// round — the Scheduler may cancel a vanished Trigger only for an Account in that set
+    /// (RF-14, RNF-04, AYD-011): an Account whose Poll failed keeps its armed Triggers.
+    func poll(fullResync: Bool) async -> (triggers: [Trigger], authoritativeAccountIds: Set<String>)
 }
 
 struct AccountSessionFactories {
@@ -99,14 +102,14 @@ final class AccountRegistry: AccountsManaging {
         accountStore.accounts = accounts
     }
 
-    func poll(fullResync: Bool) async -> (triggers: [Trigger], anyAccountSucceeded: Bool) {
+    func poll(fullResync: Bool) async -> (triggers: [Trigger], authoritativeAccountIds: Set<String>) {
         var triggers: [Trigger] = []
-        var anySucceeded = false
+        var authoritativeAccountIds: Set<String> = []
         for account in accounts {
             guard let session = live[account.id] else { continue }
             do {
                 triggers += try await session.calendar.poll(fullResync: fullResync)
-                anySucceeded = true
+                authoritativeAccountIds.insert(account.id)
                 statuses[account.id] = .connected
                 calendarsByAccount[account.id] = (try? await session.calendar.availableCalendars()) ?? calendarsByAccount[account.id] ?? []
             } catch AuthError.refreshTokenRevoked {
@@ -116,7 +119,7 @@ final class AccountRegistry: AccountsManaging {
                 print("[AccountRegistry] poll failed for \(account.id): \(error)")
             }
         }
-        return (triggers, anySucceeded)
+        return (triggers, authoritativeAccountIds)
     }
 
     private func connectAndCommit(loginHint: String?) async throws -> Account {

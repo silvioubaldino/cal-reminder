@@ -128,7 +128,9 @@ private func account(_ id: String, label: String) -> Account {
 
 private func trigger(id: String, minutesFromNow: TimeInterval = 5) -> Trigger {
     let start = Date().addingTimeInterval(minutesFromNow * 60)
-    return Trigger(id: id, eventTitle: "Event", startDate: start, fireDate: start, minutesBefore: Int(minutesFromNow))
+    // The id's own "<accountId>#..." prefix, matching how CalendarService actually builds it.
+    let accountId = String(id.split(separator: "#", maxSplits: 1)[0])
+    return Trigger(id: id, eventTitle: "Event", startDate: start, fireDate: start, minutesBefore: Int(minutesFromNow), accountId: accountId)
 }
 
 final class AccountRegistryTests: XCTestCase {
@@ -146,7 +148,7 @@ final class AccountRegistryTests: XCTestCase {
         let result = await registry.poll(fullResync: false)
 
         XCTAssertEqual(Set(result.triggers.map(\.id)), ["google:a#cal#evt#5", "google:b#cal#evt#5"])
-        XCTAssertTrue(result.anyAccountSucceeded)
+        XCTAssertEqual(result.authoritativeAccountIds, ["google:a", "google:b"])
     }
 
     func test_sameCalendarIdSharedByTwoAccountsDoesNotCollide() async {
@@ -174,6 +176,7 @@ final class AccountRegistryTests: XCTestCase {
         let result = await registry.poll(fullResync: false)
 
         XCTAssertEqual(result.triggers.map(\.id), ["google:a#cal#evt#5"])
+        XCTAssertEqual(result.authoritativeAccountIds, ["google:a"], "google:b's Poll failed — its armed Triggers must stay out of the Scheduler's reconcile scope")
         XCTAssertEqual(registry.sessions.first { $0.id == "google:a" }?.connectionStatus, .connected)
         XCTAssertEqual(registry.sessions.first { $0.id == "google:b" }?.connectionStatus, .needsReauth)
     }
@@ -190,6 +193,7 @@ final class AccountRegistryTests: XCTestCase {
         let result = await registry.poll(fullResync: false)
 
         XCTAssertEqual(result.triggers.map(\.id), ["google:a#cal#evt#5"])
+        XCTAssertEqual(result.authoritativeAccountIds, ["google:a"], "google:b's Poll failed — its armed Triggers must stay out of the Scheduler's reconcile scope")
         XCTAssertEqual(registry.sessions.first { $0.id == "google:a" }?.connectionStatus, .connected)
         XCTAssertEqual(registry.sessions.first { $0.id == "google:b" }?.connectionStatus, statusBefore, "a transient failure must not change the status (RNF-04)")
     }
@@ -205,7 +209,7 @@ final class AccountRegistryTests: XCTestCase {
         let result = await registry.poll(fullResync: true)
 
         XCTAssertTrue(result.triggers.isEmpty)
-        XCTAssertFalse(result.anyAccountSucceeded)
+        XCTAssertTrue(result.authoritativeAccountIds.isEmpty)
     }
 
     func test_addAccountRegistersANewAccountWithoutDisturbingTheFirst() async throws {

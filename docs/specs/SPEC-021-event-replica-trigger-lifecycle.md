@@ -1,7 +1,7 @@
 ---
 id: SPEC-021
 type: spec
-status: draft
+status: done
 updated: 2026-09-10
 parents: [AYD-011]
 related: [GLO, REQ-01, SPEC-013, SPEC-017]
@@ -203,12 +203,12 @@ Scenario: Reconciling never replays an already-fired Reminder
 | 3 | Steps 8–13 — `accountId`, reconciliation, the rewired call sites | Depends on PR 2 for the set to be authoritative |
 
 ## Checklist
-- [ ] A `cancelled` entry in a delta decodes and the Poll stores the new `syncToken`
-- [ ] An Event survives in the replica across Polls that do not mention it
-- [ ] A cancelled Event leaves the replica; a changed one replaces its previous version
-- [ ] A Poll escalates to a full sync once the last one is older than the resync interval
-- [ ] A Calendar whose fetch fails keeps its Triggers; a deselected one loses them
-- [ ] Waking re-arms pending Triggers against the current clock instead of dropping them
-- [ ] Reconciliation cancels vanished Triggers and never touches an Account outside its scope
-- [ ] Signing out cancels only that Account's Triggers
-- [ ] An already-fired Reminder is never re-armed
+- [x] A `cancelled` entry in a delta decodes and the Poll stores the new `syncToken`
+- [x] An Event survives in the replica across Polls that do not mention it
+- [x] A cancelled Event leaves the replica; a changed one replaces its previous version
+- [x] A Poll escalates to a full sync once the last one is older than the resync interval
+- [x] A Calendar whose fetch fails keeps its Triggers; a deselected one loses them
+- [x] Waking re-arms pending Triggers against the current clock instead of dropping them
+- [x] Reconciliation cancels vanished Triggers and never touches an Account outside its scope
+- [x] Signing out cancels only that Account's Triggers
+- [x] An already-fired Reminder is never re-armed

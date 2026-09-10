@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Implemented SPEC-021: fixed three ways a reminder could go silently missing — an event scheduled beyond the app's sync window, everything still pending when the Mac woke or an account was signed out, and a single deleted event that quietly stopped a calendar from syncing at all.
 - Designed AYD-011 and wrote SPEC-021: a plan to fix three cases where an Event was silently never announced — one scheduled beyond the window the app first looked at, everything still pending being dropped whenever the Mac woke or an account was signed out, and a single deleted Event quietly stopping a calendar from syncing at all.
 - Fixed: a published Release was built without its update feed settings, leaving it unable to update anyone; the release now carries them and refuses to publish if they are missing.
 - Implemented SPEC-020: the app now checks for and installs updates on its own — a version row, a "Check for updates…" action, and a "Check automatically" toggle (off until the user opts in) in a Distributed Build; a Source Build states plainly that it has no updater and makes no request to any feed.

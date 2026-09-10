@@ -11,8 +11,8 @@ private actor FireSpy {
 }
 
 final class SchedulerTests: XCTestCase {
-    private func trigger(id: String, fireDate: Date) -> Trigger {
-        Trigger(id: id, eventTitle: "Standup", startDate: fireDate, fireDate: fireDate, minutesBefore: 5)
+    private func trigger(id: String, fireDate: Date, accountId: String = "acct1") -> Trigger {
+        Trigger(id: id, eventTitle: "Standup", startDate: fireDate, fireDate: fireDate, minutesBefore: 5, accountId: accountId)
     }
 
     private func makeScheduler(spy: FireSpy) -> Scheduler {
@@ -26,7 +26,7 @@ final class SchedulerTests: XCTestCase {
         let fireDate = Date().addingTimeInterval(0.05)
 
         // Act
-        await scheduler.schedule([trigger(id: "evt1#5", fireDate: fireDate)])
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: fireDate)], authoritativeFor: ["acct1"])
         await scheduler.waitForPendingFires()
         try await Task.sleep(nanoseconds: 20_000_000)
 
@@ -35,17 +35,17 @@ final class SchedulerTests: XCTestCase {
         XCTAssertEqual(fired, ["evt1#5"])
     }
 
-    func test_sameIdNeverFiresTwice() async throws {
+    func test_reconcileNeverReplaysAnAlreadyFiredReminder() async throws {
         // Arrange
         let spy = FireSpy()
         let scheduler = makeScheduler(spy: spy)
         let sameTrigger = trigger(id: "evt1#10", fireDate: Date().addingTimeInterval(0.02))
 
         // Act
-        await scheduler.schedule([sameTrigger])
+        await scheduler.reconcile([sameTrigger], authoritativeFor: ["acct1"])
         await scheduler.waitForPendingFires()
         try await Task.sleep(nanoseconds: 20_000_000)
-        await scheduler.schedule([sameTrigger]) // poll() returns the same Trigger again
+        await scheduler.reconcile([sameTrigger], authoritativeFor: ["acct1"]) // Poll returns the same Trigger again
         await scheduler.waitForPendingFires()
         try await Task.sleep(nanoseconds: 20_000_000)
 
@@ -61,7 +61,7 @@ final class SchedulerTests: XCTestCase {
 
         // Act
         await scheduler.setEnabled(false)
-        await scheduler.schedule([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(0.02))])
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(0.02))], authoritativeFor: ["acct1"])
         await scheduler.waitForPendingFires()
         try await Task.sleep(nanoseconds: 20_000_000)
 
@@ -77,7 +77,7 @@ final class SchedulerTests: XCTestCase {
         let pastFireDate = Date().addingTimeInterval(-60)
 
         // Act
-        await scheduler.schedule([trigger(id: "evt1#5", fireDate: pastFireDate)])
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: pastFireDate)], authoritativeFor: ["acct1"])
         await scheduler.waitForPendingFires()
 
         // Assert
@@ -85,34 +85,115 @@ final class SchedulerTests: XCTestCase {
         XCTAssertTrue(fired.isEmpty)
     }
 
-    func test_nextArmedTriggerReflectsSoonestAcrossSeparateSchedules() async {
-        // Arrange: two separate schedule() calls, mirroring two incremental Polls that
-        // each report a different subset of still-upcoming Events.
+    func test_nextArmedTriggerReflectsSoonestAcrossSeparateAccountsReconciles() async {
+        // Arrange: two Accounts, each reconciled independently — mirroring two Accounts'
+        // Polls landing separately (RF-14) — must not affect each other's armed Trigger.
         let spy = FireSpy()
         let scheduler = makeScheduler(spy: spy)
-        let soon = trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(60))
-        let later = trigger(id: "evt2#5", fireDate: Date().addingTimeInterval(120))
+        let later = trigger(id: "acctA#evt2#5", fireDate: Date().addingTimeInterval(120), accountId: "acctA")
+        let soon = trigger(id: "acctB#evt1#5", fireDate: Date().addingTimeInterval(60), accountId: "acctB")
 
         // Act
-        await scheduler.schedule([later])
-        await scheduler.schedule([soon])
+        await scheduler.reconcile([later], authoritativeFor: ["acctA"])
+        await scheduler.reconcile([soon], authoritativeFor: ["acctB"])
 
         // Assert
         let next = await scheduler.nextArmedTrigger()
-        XCTAssertEqual(next?.id, "evt1#5")
+        XCTAssertEqual(next?.id, "acctB#evt1#5")
     }
 
-    func test_nextArmedTriggerIsNilAfterCancelAll() async {
-        // Arrange
+    func test_reconcileCancelsATriggerAbsentFromTheNewAuthoritativeSet() async {
+        // Arrange — the Event this Trigger came from is gone from the latest Poll's result
         let spy = FireSpy()
         let scheduler = makeScheduler(spy: spy)
-        await scheduler.schedule([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(60))])
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(60))], authoritativeFor: ["acct1"])
 
         // Act
-        await scheduler.cancelAll()
+        await scheduler.reconcile([], authoritativeFor: ["acct1"])
 
         // Assert
         let next = await scheduler.nextArmedTrigger()
         XCTAssertNil(next)
     }
+
+    func test_reconcileDoesNotCancelTriggersOutsideItsAuthoritativeScope() async {
+        // Arrange — Account B has an armed Trigger from an earlier, successful Poll, soon to fire
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        let accountBTrigger = trigger(id: "acctB#evt1#5", fireDate: Date().addingTimeInterval(30), accountId: "acctB")
+        await scheduler.reconcile([accountBTrigger], authoritativeFor: ["acctB"])
+
+        // Act — Account A's Poll succeeds this round; Account B's failed and isn't in scope,
+        // even though B's Trigger is (correctly) absent from this reconcile's own trigger list
+        let accountATrigger = trigger(id: "acctA#evt2#5", fireDate: Date().addingTimeInterval(60), accountId: "acctA")
+        await scheduler.reconcile([accountATrigger], authoritativeFor: ["acctA"])
+
+        // Assert — B is still the soonest armed Trigger: it was never touched by A's reconcile
+        let next = await scheduler.nextArmedTrigger()
+        XCTAssertEqual(next?.id, "acctB#evt1#5")
+    }
+
+    func test_cancelAccountDropsOnlyThatAccountsTriggers() async {
+        // Arrange
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        await scheduler.reconcile(
+            [
+                trigger(id: "acctA#evt1#5", fireDate: Date().addingTimeInterval(60), accountId: "acctA"),
+                trigger(id: "acctB#evt1#5", fireDate: Date().addingTimeInterval(30), accountId: "acctB")
+            ],
+            authoritativeFor: ["acctA", "acctB"]
+        )
+
+        // Act
+        await scheduler.cancel(accountId: "acctB")
+
+        // Assert — only Account A's Trigger remains armed
+        let next = await scheduler.nextArmedTrigger()
+        XCTAssertEqual(next?.id, "acctA#evt1#5")
+    }
+
+    func test_rearmAllKeepsArmedTriggersAndRecomputesTheirDelay() async throws {
+        // Arrange
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        let fireDate = Date().addingTimeInterval(120)
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: fireDate)], authoritativeFor: ["acct1"])
+
+        // Act — mirrors waking from sleep: the Task's own clock didn't advance while asleep
+        await scheduler.rearmAll()
+
+        // Assert — still armed, same Trigger
+        let next = await scheduler.nextArmedTrigger()
+        XCTAssertEqual(next?.id, "evt1#5")
+        XCTAssertEqual(next?.fireDate, fireDate)
+    }
+
+    func test_rearmAllDropsATriggerThatWentPastDueWhileAsleep() async throws {
+        // Arrange — armed while both Triggers are still in the future
+        let spy = FireSpy()
+        let clock = MutableClock(now: Date())
+        let scheduler = Scheduler(clock: clock.now, onFire: { trigger in Task { await spy.record(trigger) } })
+        let soonToBePastDue = trigger(id: "evt1#5", fireDate: clock.currentDate.addingTimeInterval(60))
+        let stillUpcoming = trigger(id: "evt2#5", fireDate: clock.currentDate.addingTimeInterval(600))
+        await scheduler.reconcile([soonToBePastDue, stillUpcoming], authoritativeFor: ["acct1"])
+
+        // Act — the clock jumps forward past the first Trigger's fireDate, as it would across
+        // a sleep the OS didn't account for in `Task.sleep`'s own clock (RNF-04)
+        clock.advance(by: 120)
+        await scheduler.rearmAll()
+
+        // Assert — the past-due one is dropped, the still-upcoming one survives
+        let next = await scheduler.nextArmedTrigger()
+        XCTAssertEqual(next?.id, "evt2#5")
+    }
+}
+
+/// A settable clock for tests that need to simulate time passing without a real `Task.sleep`.
+private final class MutableClock {
+    private var date: Date
+    init(now: Date) { self.date = now }
+    var currentDate: Date { date }
+    func now() -> Date { date }
+    func advance(by seconds: TimeInterval) { date = date.addingTimeInterval(seconds) }
 }

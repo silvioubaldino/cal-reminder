@@ -3,7 +3,7 @@ id: ARCH
 type: architecture
 title: Architecture overview (living C4)
 status: approved
-updated: 2026-09-08
+updated: 2026-09-10
 parents: []
 related: []
 ---
@@ -69,8 +69,8 @@ flowchart TB
 | **AppCoordinator** | Wires modules together; holds `AppState`; re-Polls on Calendar-selection changes, and full-resyncs on Reminder-selection changes | AYD-001, AYD-002, AYD-007, AYD-008 |
 | **AccountRegistry** | Owns one `AccountSession` per connected Account; fans Poll out across them; handles add/reconnect/sign-out and the legacy single-account migration | AYD-007 |
 | **AuthManager** *(one per connected Account)* | OAuth PKCE flow + token refresh + Keychain storage, scoped to its Account | AYD-001, AYD-007 |
-| **CalendarService** *(one per connected Account)* | List that Account's Calendars, Poll each selected one (per-Calendar sync), parse Events, resolve the effective Reminders (Event's own + Extra Reminders) → Triggers | AYD-001, AYD-002, AYD-007, AYD-008 |
-| **Scheduler** | Precise local timers per Trigger + dedupe + sleep/wake handling | AYD-001 |
+| **CalendarService** *(one per connected Account)* | List that Account's Calendars, Poll each selected one (per-Calendar sync), keep a local replica of each Calendar's Events and derive the complete Trigger set from it every Poll, parse Events, resolve the effective Reminders (Event's own + Extra Reminders) → Triggers | AYD-001, AYD-002, AYD-007, AYD-008, AYD-011 |
+| **Scheduler** | Precise local timers per Trigger + dedupe; reconciles the armed set against each Poll's complete result, scoped per Account; re-arms on wake instead of dropping | AYD-001, AYD-011 |
 | **OverlayPresenter** | `NSPanel` over all windows + animation + FIFO queue | AYD-001 |
 | **UpdateController** | Checks the Appcast for a newer Release, verifies its signature against the embedded public key, installs with the user's consent; inert in a Source Build | AYD-009, TDR-006 |
 

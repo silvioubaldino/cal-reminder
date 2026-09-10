@@ -183,7 +183,8 @@ final class CalendarService: CalendarServicing {
                         startDate: startDate,
                         fireDate: startDate.addingTimeInterval(-Double(minutes) * 60),
                         minutesBefore: minutes,
-                        calendarColorHex: colorsById[calendarId] ?? nil
+                        calendarColorHex: colorsById[calendarId] ?? nil,
+                        accountId: accountId
                     ))
                 }
             }

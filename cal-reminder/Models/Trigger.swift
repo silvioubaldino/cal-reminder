@@ -2,7 +2,7 @@ import Foundation
 
 /// The computed moment to fire the animation: `Event start − Reminder minutes` (GLO: Trigger).
 struct Trigger: Identifiable, Equatable, Sendable {
-    /// Dedupe key: "<calendarId>#<eventId>#<minutes>" (RN-03).
+    /// Dedupe key: "<accountId>#<calendarId>#<eventId>#<minutes>" (RN-03).
     let id: String
     let eventTitle: String
     let startDate: Date
@@ -13,6 +13,10 @@ struct Trigger: Identifiable, Equatable, Sendable {
     /// Poll that resolved it. Kept as a String, not an `NSColor`: the domain model stays
     /// free of AppKit. `nil` when the Calendar has no color, or for the test animation.
     let calendarColorHex: String?
+    /// The Account (GLO) this Trigger's Event came from — lets the Scheduler reconcile and
+    /// cancel Triggers scoped to one Account without a Poll failure elsewhere disarming it
+    /// (RF-14, RNF-04, AYD-011).
+    let accountId: String
 
     init(
         id: String,
@@ -20,7 +24,8 @@ struct Trigger: Identifiable, Equatable, Sendable {
         startDate: Date,
         fireDate: Date,
         minutesBefore: Int,
-        calendarColorHex: String? = nil
+        calendarColorHex: String? = nil,
+        accountId: String
     ) {
         self.id = id
         self.eventTitle = eventTitle
@@ -28,5 +33,6 @@ struct Trigger: Identifiable, Equatable, Sendable {
         self.fireDate = fireDate
         self.minutesBefore = minutesBefore
         self.calendarColorHex = calendarColorHex
+        self.accountId = accountId
     }
 }
