@@ -12,8 +12,20 @@ extension CalendarServicing {
     }
 }
 
+/// Polls Google Calendar and derives Triggers from a local **replica** of each selected
+/// Calendar's Events, not from whichever response a given Poll happened to receive (AYD-011):
+/// an incremental delta only reports what changed (RNF-06), so a Poll's return value is only
+/// a complete, correct set of Triggers if it is built from the accumulated state, replica
+/// included with a Calendar that fetched successfully in some prior Poll but not this one.
 final class CalendarService: CalendarServicing {
-    private static let pollWindow: TimeInterval = 2 * 60 * 60
+    /// How far ahead a full sync looks. Paired with `fullResyncInterval` below by AYD-011's
+    /// `W ≥ R + M` rule: 48 h comfortably covers the app's largest supported Reminder lead
+    /// time (RF-15's "1 day before" is 24 h) even at the staleest point of the resync cycle.
+    private static let pollWindow: TimeInterval = 48 * 60 * 60
+    /// A syncToken's window is frozen at the moment it was minted — Google rejects sending
+    /// `timeMin`/`timeMax` alongside one — so without a periodic full sync it never slides
+    /// forward and an Event scheduled beyond it would never generate a Trigger (AYD-011).
+    private static let fullResyncInterval: TimeInterval = 6 * 60 * 60
 
     private let api: GoogleCalendarAPIProtocol
     private let accountId: String
@@ -23,6 +35,10 @@ final class CalendarService: CalendarServicing {
 
     private var syncTokens: [String: String] = [:]
     private var cachedDefaultReminders: [String: [GoogleCalendarDefaultReminder]] = [:]
+    /// Each selected Calendar's Events inside the current window, keyed by Calendar then
+    /// Event id — the source Triggers are derived from on every Poll (AYD-011).
+    private var replica: [String: [String: GoogleEvent]] = [:]
+    private var lastFullSync: Date?
 
     init(
         api: GoogleCalendarAPIProtocol,
@@ -45,44 +61,48 @@ final class CalendarService: CalendarServicing {
     }
 
     func poll(fullResync: Bool) async throws -> [Trigger] {
-        if fullResync {
-            syncTokens.removeAll()
-        }
+        let now = clock()
         let calendars = try await api.listCalendars()
         let allIds = Set(calendars.map(\.id))
         let selectedIds = selectionStore.selectedCalendarIds?.intersection(allIds) ?? allIds
         print("[poll] \(calendars.count) available Calendars \(calendars.map(\.id)); stored selection=\(String(describing: selectionStore.selectedCalendarIds)); polling \(selectedIds)")
 
+        // A decision made once for the whole Poll, not per Calendar (AYD-011): dropping every
+        // stored syncToken here is what makes each Calendar's own fetch (below) a full sync —
+        // a Calendar that has never synced still gets one regardless of this flag.
+        let mustFullSync = fullResync
+            || (lastFullSync.map { now.timeIntervalSince($0) >= Self.fullResyncInterval } ?? true)
+        if mustFullSync {
+            syncTokens.removeAll()
+            lastFullSync = now
+        }
+
         let colorsById = Dictionary(calendars.map { ($0.id, $0.backgroundColor) }, uniquingKeysWith: { _, last in last })
         // Read once per Poll, not at init: a Reminder-selection change (RF-15) must be picked
         // up by the very next Poll — which is the full resync the change itself triggers.
         let reminderSettings = reminderSettingsStore.settings
+        let windowEnd = now.addingTimeInterval(Self.pollWindow)
 
-        var triggers: [Trigger] = []
         for calendarId in selectedIds {
             do {
-                triggers += try await pollTriggers(
-                    calendarId: calendarId,
-                    calendarColorHex: colorsById[calendarId] ?? nil,
-                    reminderSettings: reminderSettings,
-                    retryOnExpiredToken: true
-                )
+                try await fetchAndApply(calendarId: calendarId, windowEnd: windowEnd, retryOnExpiredToken: true)
             } catch AuthError.refreshTokenRevoked {
                 throw AuthError.refreshTokenRevoked
             } catch {
-                print("[poll] Calendar '\(calendarId)' failed: \(error) — skipping it for this Poll")
+                print("[poll] Calendar '\(calendarId)' failed: \(error) — skipping it for this Poll; its replica (if any) is kept as-is")
             }
         }
-        return triggers
+
+        return deriveTriggers(selectedIds: selectedIds, colorsById: colorsById, reminderSettings: reminderSettings, now: now)
     }
 
-    private func pollTriggers(
-        calendarId: String,
-        calendarColorHex: String?,
-        reminderSettings: ReminderSettings,
-        retryOnExpiredToken: Bool
-    ) async throws -> [Trigger] {
+    /// Fetches one Calendar and applies the response to its replica: a full sync (no stored
+    /// syncToken) replaces the replica outright; an incremental one upserts changed Events and
+    /// removes cancelled ones. The replica is only touched **after** a successful fetch, so a
+    /// failure here leaves the previous replica — and Triggers derived from it — untouched.
+    private func fetchAndApply(calendarId: String, windowEnd: Date, retryOnExpiredToken: Bool) async throws {
         let now = clock()
+        let isFullSync = syncTokens[calendarId] == nil
         let events: [GoogleEvent]
         let nextSyncToken: String?
         let responseDefaults: [GoogleCalendarDefaultReminder]?
@@ -90,17 +110,30 @@ final class CalendarService: CalendarServicing {
             (events, nextSyncToken, responseDefaults) = try await api.listEvents(
                 calendarId: calendarId,
                 timeMin: now,
-                timeMax: now.addingTimeInterval(Self.pollWindow),
+                timeMax: windowEnd,
                 syncToken: syncTokens[calendarId]
             )
         } catch GoogleCalendarAPIError.unexpectedStatus(410) where retryOnExpiredToken {
             syncTokens[calendarId] = nil
-            return try await pollTriggers(
-                calendarId: calendarId,
-                calendarColorHex: calendarColorHex,
-                reminderSettings: reminderSettings,
-                retryOnExpiredToken: false
-            )
+            return try await fetchAndApply(calendarId: calendarId, windowEnd: windowEnd, retryOnExpiredToken: false)
+        }
+
+        if isFullSync {
+            var fresh: [String: GoogleEvent] = [:]
+            for event in events where event.status != "cancelled" {
+                fresh[event.id] = event
+            }
+            replica[calendarId] = fresh
+        } else {
+            var calendarReplica = replica[calendarId] ?? [:]
+            for event in events {
+                if event.status == "cancelled" {
+                    calendarReplica.removeValue(forKey: event.id)
+                } else {
+                    calendarReplica[event.id] = event
+                }
+            }
+            replica[calendarId] = calendarReplica
         }
 
         if let nextSyncToken {
@@ -109,32 +142,55 @@ final class CalendarService: CalendarServicing {
         if let responseDefaults {
             cachedDefaultReminders[calendarId] = responseDefaults
         }
-        let defaults = cachedDefaultReminders[calendarId] ?? []
+    }
 
-        return events.flatMap { event -> [Trigger] in
-            guard event.status != "cancelled" else { return [] }
-            guard let startDate = Self.parseDate(event.start?.dateTime) else {
-                print("[poll] skip '\(event.summary ?? "")' — no dateTime (all-day?) start=\(String(describing: event.start?.dateTime))")
-                return []
-            }
+    /// One pass over the replica of every selected Calendar → the complete desired set of
+    /// Triggers. Also prunes Events whose start has already passed, so the replica doesn't
+    /// grow without bound; an all-day Event (no `dateTime`) is skipped without being pruned,
+    /// matching RN-01 — the app has no reliable way to tell it's "past" from `date` alone.
+    private func deriveTriggers(
+        selectedIds: Set<String>,
+        colorsById: [String: String?],
+        reminderSettings: ReminderSettings,
+        now: Date
+    ) -> [Trigger] {
+        var triggers: [Trigger] = []
+        for calendarId in selectedIds {
+            guard let events = replica[calendarId] else { continue }
+            let defaults = cachedDefaultReminders[calendarId] ?? []
+            var prunedEvents = events
 
-            let minutesList = ReminderResolver.popupReminderMinutes(
-                for: event,
-                calendarDefaults: defaults,
-                settings: reminderSettings
-            )
-            print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
-            return minutesList.map { minutes in
-                Trigger(
-                    id: "\(accountId)#\(calendarId)#\(event.id)#\(minutes)",
-                    eventTitle: event.summary ?? "",
-                    startDate: startDate,
-                    fireDate: startDate.addingTimeInterval(-Double(minutes) * 60),
-                    minutesBefore: minutes,
-                    calendarColorHex: calendarColorHex
+            for (eventId, event) in events {
+                guard let startDate = Self.parseDate(event.start?.dateTime) else {
+                    print("[poll] skip '\(event.summary ?? "")' — no dateTime (all-day?) start=\(String(describing: event.start?.dateTime))")
+                    continue
+                }
+                guard startDate >= now else {
+                    prunedEvents.removeValue(forKey: eventId)
+                    continue
+                }
+
+                let minutesList = ReminderResolver.popupReminderMinutes(
+                    for: event,
+                    calendarDefaults: defaults,
+                    settings: reminderSettings
                 )
+                print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
+                for minutes in minutesList {
+                    triggers.append(Trigger(
+                        id: "\(accountId)#\(calendarId)#\(eventId)#\(minutes)",
+                        eventTitle: event.summary ?? "",
+                        startDate: startDate,
+                        fireDate: startDate.addingTimeInterval(-Double(minutes) * 60),
+                        minutesBefore: minutes,
+                        calendarColorHex: colorsById[calendarId] ?? nil
+                    ))
+                }
             }
+
+            replica[calendarId] = prunedEvents
         }
+        return triggers
     }
 
     private static func parseDate(_ string: String?) -> Date? {
