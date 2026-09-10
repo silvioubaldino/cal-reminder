@@ -140,7 +140,8 @@ jobs:
             "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
           mkdir -p sparkle-tools && tar -xJf sparkle.tar.xz -C sparkle-tools
 
-          sparkle-tools/bin/generate_appcast \
+          echo "$SPARKLE_PRIVATE_KEY" | sparkle-tools/bin/generate_appcast \
+            --ed-key-file - \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" \
             -o build/appcast-item.xml \
             build/appcast-new
