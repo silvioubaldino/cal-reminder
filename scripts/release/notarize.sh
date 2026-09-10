@@ -19,7 +19,8 @@ for var in NOTARY_KEY_ID NOTARY_ISSUER_ID NOTARY_KEY_P8; do
 done
 
 KEY_FILE="$(mktemp -t notary-key).p8"
-cleanup() { rm -f "$KEY_FILE" "$SUBMISSION" 2>/dev/null || true; }
+TEMP_SUBMISSION=""
+cleanup() { rm -f "$KEY_FILE" "$TEMP_SUBMISSION" 2>/dev/null || true; }
 trap cleanup EXIT
 
 printf '%s' "$NOTARY_KEY_P8" > "$KEY_FILE"
@@ -27,10 +28,13 @@ chmod 600 "$KEY_FILE"
 
 case "$ARTIFACT" in
   *.app)
-    SUBMISSION="$(mktemp -t notary-submission).zip"
+    TEMP_SUBMISSION="$(mktemp -t notary-submission).zip"
+    SUBMISSION="$TEMP_SUBMISSION"
     ditto -c -k --keepParent "$ARTIFACT" "$SUBMISSION"
     ;;
   *.dmg)
+    # The .dmg is submitted as-is: it is the artifact itself, not a temporary copy,
+    # so cleanup must never remove it (it previously did, deleting every notarized dmg).
     SUBMISSION="$ARTIFACT"
     ;;
   *)
