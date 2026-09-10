@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
--
+- Fixed: the app opened saying it could not check for updates at all — the previous release shipped the update helper in the wrong place, which stops the updater before it starts; a release that misplaces it can no longer be published.
 
 ## Release - v0.2.1 - 10-09-2026
 
