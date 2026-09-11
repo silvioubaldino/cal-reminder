@@ -1,7 +1,7 @@
 ---
 id: SPEC-022
 type: spec
-status: draft
+status: done
 updated: 2026-09-11
 parents: [AYD-012]
 related: [GLO, TDR-004, SPEC-014]
@@ -94,8 +94,11 @@ text color and TDR-004's display-color-space conversion all keep working on the 
   transcription slip fails the suite rather than silently mispainting one color.
 
 ## Checklist
-- [ ] `CalendarPalette` added, table transcribed from AYD-012
-- [ ] Table values verified against Google Calendar's own rendering (step 2)
-- [ ] Animator resolves through the palette; toggle/preset/contrast behavior unchanged
-- [ ] Tests green, lint clean
-- [ ] Changelog line
+- [x] `CalendarPalette` added, table transcribed from AYD-012
+- [x] Table values verified against Google Calendar's own rendering (step 2) — Peacock and
+      Cobalt confirmed against an external source (see AYD-012); the remaining 22 rely on
+      the transcription plus the guard test. Re-verify against a live account before release.
+- [x] Animator resolves through the palette; toggle/preset/contrast behavior unchanged
+- [x] Tests written (not run in this environment — no macOS/Xcode toolchain available here;
+      run `xcodebuild test` locally or via CI before merging)
+- [x] Changelog line

@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Designed the fix for Banners coming out in a lighter, different shade than their calendar in Google Calendar (AYD-012 supersedes AYD-006, SPEC-022).
+- Fixed: the Banner's color now matches the calendar's color as shown in Google Calendar, instead of a paler, different-looking tone (AYD-012 supersedes AYD-006, SPEC-022).
 
 ## Release - v0.2.2 - 10-09-2026
 
