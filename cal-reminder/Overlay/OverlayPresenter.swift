@@ -32,10 +32,13 @@ final class DefaultOverlayAnimator: OverlayAnimating {
 
     /// The Banner's background for this flight: the Event's Calendar Color when the user
     /// asked for it and it parses, otherwise the chosen preset (RF-13 falls back to RF-08).
+    /// The hex is translated through `CalendarPalette` first (AYD-012): the Calendar API
+    /// still serves its legacy palette, which is a visibly different tone from what Google
+    /// Calendar's own UI paints for the same color.
     func bannerBackgroundColor(for calendarColorHex: String?) -> NSColor {
         guard matchCalendarColorStore.matchCalendarColor,
               let calendarColorHex,
-              let color = NSColor(bannerHex: calendarColorHex) else {
+              let color = NSColor(bannerHex: CalendarPalette.displayedHex(for: calendarColorHex)) else {
             return colorStore.bannerColor.color
         }
         return color

@@ -168,4 +168,41 @@ final class BannerColorStoreTests: XCTestCase {
         XCTAssertEqual(colorless, BannerColor.blue.color)
         XCTAssertEqual(malformed, BannerColor.blue.color)
     }
+
+    // MARK: - Calendar Color displayed palette (AYD-012)
+
+    @MainActor
+    func test_paintsTheCalendarColorAsGoogleDisplaysItNotAsTheAPIReturnsIt() throws {
+        // Arrange — Peacock: the API's legacy hex vs. what Google Calendar's UI paints.
+        let animator = DefaultOverlayAnimator(
+            colorStore: StubBannerColorStore(bannerColor: .blue),
+            matchCalendarColorStore: StubMatchCalendarColorStore(matchCalendarColor: true)
+        )
+
+        // Act
+        let painted = try XCTUnwrap(animator.bannerBackgroundColor(for: "#9fe1e7").usingColorSpace(.sRGB))
+        let textColor = animator.bannerBackgroundColor(for: "#9fe1e7").readableBannerTextColor
+
+        // Assert — #039be5 (Peacock, displayed), not #9fe1e7 (Peacock, legacy API value).
+        XCTAssertEqual(painted.redComponent, 0x03 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(painted.greenComponent, 0x9b / 255.0, accuracy: 0.001)
+        XCTAssertEqual(painted.blueComponent, 0xe5 / 255.0, accuracy: 0.001)
+        // The translated color is dark enough to need white text, unlike the pale legacy value.
+        XCTAssertEqual(textColor, .white)
+    }
+
+    @MainActor
+    func test_stillFallsBackToThePresetWhenMatchingIsOffEvenForAPaletteColor() {
+        // Arrange
+        let animator = DefaultOverlayAnimator(
+            colorStore: StubBannerColorStore(bannerColor: .green),
+            matchCalendarColorStore: StubMatchCalendarColorStore(matchCalendarColor: false)
+        )
+
+        // Act
+        let result = animator.bannerBackgroundColor(for: "#9fe1e7")
+
+        // Assert
+        XCTAssertEqual(result, BannerColor.green.color)
+    }
 }

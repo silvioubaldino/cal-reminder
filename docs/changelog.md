@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-09-10
+updated: 2026-09-11
 ---
 
 # Changelog
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
--
+- Fixed: the Banner's color now matches the calendar's color as shown in Google Calendar, instead of a paler, different-looking tone (AYD-012 supersedes AYD-006, SPEC-022).
 
 ## Release - v0.2.2 - 10-09-2026
 
