@@ -37,7 +37,7 @@ enum CalendarPalette {
         "cca6ac": "#ad1457", // Radicchio
         "f691b2": "#d81b60", // Cherry Blossom
         "cd74e6": "#8e24aa", // Grape
-        "a47ae2": "#9e69af", // Amethyst
+        "a47ae2": "#9e69af" // Amethyst
     ]
 
     /// The hex Google Calendar's UI paints for `calendarColorHex`. Matches case-insensitively

@@ -28,7 +28,7 @@ final class CalendarPaletteTests: XCTestCase {
         ("cca6ac", "#ad1457"), // Radicchio
         ("f691b2", "#d81b60"), // Cherry Blossom
         ("cd74e6", "#8e24aa"), // Grape
-        ("a47ae2", "#9e69af"), // Amethyst
+        ("a47ae2", "#9e69af") // Amethyst
     ]
 
     func test_hasExactlyTwentyFourEntriesWithNoDuplicates() {
