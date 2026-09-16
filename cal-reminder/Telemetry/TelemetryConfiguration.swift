@@ -11,6 +11,8 @@ struct TelemetryConfiguration {
         guard
             let endpointString = endpoint?.trimmingCharacters(in: .whitespacesAndNewlines), !endpointString.isEmpty,
             let url = URL(string: endpointString),
+            let scheme = url.scheme, scheme == "http" || scheme == "https",
+            url.host != nil,
             let key = key?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
         else {
             return nil
