@@ -16,215 +16,175 @@ superseded_by: null
 > what receives it, and how the project turns that into numbers it can look at (RF-17, RF-18,
 > RNF-13). It **does not supersede AYD-009** — AYD-009 listed telemetry as a non-goal because
 > RNF-12 forbade it at the time; RNF-12 has since been rewritten, and AYD-009's distribution
-> design is untouched here (it already anticipated the Appcast moving host: "`SUFeedURL` is the
-> only coupling, and it is one string"). Source of the design — the SPECs implement it.
+> design is untouched here. Source of the design — the SPECs implement it.
 
 ## Goal
-Today the project ships an app and then goes blind. Nobody knows how many people run it, on
-which version, whether an update was adopted, whether the airplane ever flies, or that it
-crashed. RNF-13 asks for those numbers without collecting anything personal; RF-17 and RF-18 say
-what the app is allowed to send. This design introduces the **Project Service** — a small Go
-service on Cloud Run — and the two report shapes the app sends it.
+Today the project ships an app and then goes blind. Nobody knows whether anyone opens it, on
+which version, whether the airplane ever flies, or that it crashed. This design answers exactly
+three questions, and deliberately no more:
 
-It also lays the foundation the subscription work will stand on, deliberately and cheaply: the
-same service, the same Install identity, the same daily check-in. That is a stated intent, not
-scope — no Stripe, no entitlements, no feature lock ships here.
+1. **How many airplanes flew?** — is the app doing its job, and how often.
+2. **How many Installs were used today, on which version?** — is anyone there, and did a release
+   get adopted.
+3. **How many updates were installed?** — optional, and the same signal seen from the other side.
 
-Non-goals: subscriptions and entitlements; the landing page; download and Homebrew counts (they
-come from GitHub and Homebrew for free, with no code); any identity that is not a random
-per-Install identifier; and any per-event stream — the app reports counts, never a log of what
-happened when.
+Plus crash reports (RF-18), which are not a metric.
+
+Non-goals, all of them chosen rather than deferred: counting distinct Installs with any
+consistency; 7- and 30-day actives; retention and cohorts; total Installs ever; fleet totals of
+Accounts and Calendars; subscriptions and entitlements; the landing page; download and Homebrew
+counts (GitHub and Homebrew publish those for free); per-event streams.
 
 ## Analysis
 
 ### RNF-12 had to move first, and it did
 
 RNF-12 used to forbid "phone-home" outright, and AYD-009 inherited that as a non-goal. The
-requirement has been rewritten because the old wording conflated two different things: **gating**
-a capability behind a server, and **measuring** how the app is doing. The first is what "sold on
-trust" exists to rule out; the second is ordinary product operation. What survives, and what this
-design must not break, is that a **Source Build** is complete and silent: it contacts no
-project-owned server, ever, and that is testable rather than promised (RNF-13).
+requirement has been rewritten because the old wording conflated **gating** a capability behind a
+server with **measuring** how the app is doing. The first is what "sold on trust" exists to rule
+out; the second is ordinary product operation. What survives, and what this design must not
+break, is that a **Source Build** is complete and silent: it contacts no project-owned server,
+ever, and that is testable rather than promised (RNF-13).
 
-That single rule is why the configuration gate below is the first thing the design decides.
+### What counting distinct Installs would have cost
 
-### Metrics cannot count distinct things — so state needs somewhere to live
+The obvious next question after "how many were used today" is "how many are still around after a
+month". Answering it *consistently* requires remembering which Installs have been seen — which
+means a per-Install identifier, a database holding one record each, a scheduled job to aggregate
+the population, and a definition of "active" baked into that job. That is a database, a cron, a
+rollup endpoint, a scale ceiling and a pile of design surface, in service of one class of answer.
 
-Cloud Monitoring stores time series of numbers. It has no distinct-count primitive, and the
-Install identifier can never become a metric label (cardinality). So "how many Installs are
-active" is not derivable from any counter: 37 reports may be 37 Installs or one Install
-reporting 37 times.
+This design does not buy it. Retention numbers are worth that machinery for a product with a
+growth loop to tune; for a project that mainly needs to know whether anyone is there and whether
+a release landed, they are not. **The `installId` is therefore gone entirely** — not stored, not
+sent, not generated. With nothing to deduplicate server-side, the reports carry no identifier at
+all, which is both less code and a materially better privacy story.
 
-That question needs something that **remembers which Installs it has seen**. This is state, not
-a metric, and it is the whole reason a database appears in a design that is otherwise just
-counters.
+If subscriptions arrive, they bring their own identity (a per-Install key pair whose private half
+never ships) and the retention questions become answerable again as a side effect. That is the
+right moment to pay for it.
 
-The tempting alternative is an `UpDownCounter`: the app sends `+1` when an Account is connected,
-`-1` when it is disconnected, and the fleet total emerges with no database. It is rejected, and
-the reason generalizes into the rule this design is built on:
+### Everything left is an additive counter
 
-> A total assembled from deltas **cannot self-heal**. Every delta must arrive exactly once,
-> forever. A lost `-1` is wrong permanently; a duplicated `+1` likewise; and an Install that is
-> simply deleted never sends its closing deltas at all — so the total counts departed users
-> forever, drifting upward systematically rather than randomly.
+Dropping the population aggregates leaves only numbers that each request can contribute to
+directly:
 
-Contrast an event counter: losing one report loses one animation from one hour's bar. The error
-is local and bounded. A running total's error is permanent and cumulative, and after months there
-is no way to know how far it has drifted.
+| What | Why it works from the request |
+|---|---|
+| Airplanes flown | Each report carries a delta; summing deltas across Installs is exactly right |
+| Used today | Each Install contributes **at most one** per calendar day (see below), so the daily sum is the number of Installs used that day |
+| Update installed | One event per Install per version change |
 
-Restating absolute state fixes this by construction. Every Install says "I have 2 Accounts now"
-once a day; the totals are recomputed from scratch. A lost report is corrected by the next one, a
-duplicate overwrites the same document, and an Install that disappears ages out of the count on
-its own — because absence is measurable when you hold state, and unrepresentable when you only
-accept deltas. A client that has gone away cannot send the event that says so.
+No value here is a level that goes up and down, so no gauge is published, and nothing needs to see
+the whole fleet at once. The consequence is the shape of the whole service: **no database, no
+scheduled job, no rollup, no aggregation.** A handler validates a batch, increments counters, and
+answers.
 
-### Additive versus population-aggregate — the rule that shapes the endpoints
+### The daily dedupe moves to the client
 
-From the above, each number has exactly one place it can legitimately be produced:
+"Used today" is only a count of Installs if each Install reports it once. That is enforced in the
+app: it keeps the last **local calendar day** on which it sent the event, and sends it the first
+time it does anything on a new day — a launch, or the first Reminder animation, whichever comes
+first. A second launch the same day adds nothing.
 
-| Shape | Can be published from the request? | Because |
-|---|---|---|
-| Counter (animations played) | **Yes** | Additive: each request contributes its own delta, and summing deltas across Installs is correct |
-| Histogram (Accounts per Install) | **Yes** | Additive: each request contributes one sample |
-| Gauge over the population (active Installs, fleet totals, version spread) | **No** | One request sees one Install; the answer is about all of them at once |
+Calendar-day, not "24 hours elapsed": elapsed time drifts and can produce two events in one day or
+none in another, while a date comparison dedupes exactly. Installs in different time zones smear
+the boundary by a few hours, which does not matter at the resolution anyone reads this number.
 
-A request cannot compute a population aggregate without reading the whole collection, which is
-`O(fleet)` work done `O(fleet)` times a day — quadratic, and dead well inside the free tier.
-So the aggregate runs **once a day, from a single writer**. That is the rollup, and it is the
-only job Cloud Scheduler has here.
+What the number therefore is, stated honestly so nobody over-reads it: **Installs that opened or
+fired at least one Reminder on a given day, among those that have Telemetry switched on.** It is
+not unique users, and it is a lower bound.
 
-This also removes the multi-writer hazard entirely for gauges: a single daily writer never
-collides with the "one point per time series per 5 seconds" limit, and never writes out of order.
+### One endpoint, an allowlist of names
 
-### Two endpoints, because the two reports have different cadences and different destinations
+Every report is now the same shape — a name and a value — so there is one endpoint and one
+payload. The metric name is **not** free-form: the service holds an allowlist, and an unknown name
+is dropped. A metric name reaching Cloud Monitoring is what creates a time series, so letting a
+client invent one is the one place a bad actor could cost real money.
 
-Events and state want different frequencies — an animation count is only useful at a resolution
-finer than a day, while "how many Accounts does this Install have" changes rarely and is a daily
-concept. Folding both into one endpoint forces a conditional ("write the database only if the
-last write is older than 20 h") that exists purely to reconcile two cadences inside one handler.
-
-Splitting them by cadence removes it, and leaves each handler with one destination:
-
-- **`/v1/events`** — hourly, **only when there is something to report**. Publishes a counter.
-  Never touches Firestore.
-- **`/v1/state`** — on launch and every 24 h. Writes Firestore, publishes the Accounts and
-  Calendars histograms. Publishes no fleet total.
-
-A consequence worth stating because it is load-bearing: since `/v1/events` disappears when the
-app is idle, it is **not** a liveness signal. `lastSeen` — and therefore every "active Installs"
-number — comes exclusively from `/v1/state`. That is why `/v1/state` fires on launch and on an
-elapsed-time check, never at a fixed hour of the day: a Mac that is asleep at 03:00 must still be
-counted as active.
+Adding a metric later is one entry in that allowlist plus one call site in the app — no new route,
+no new contract.
 
 ### The configuration gate is the Source Build guarantee
 
-`TelemetryConfiguration.make(endpoint:key:)` returns `nil` when either value is absent, exactly
-as `UpdateConfiguration.make(feedURL:publicKey:)` already does for Sparkle
+`TelemetryConfiguration.make(endpoint:key:)` returns `nil` when either value is absent, exactly as
+`UpdateConfiguration.make(feedURL:publicKey:)` already does for Sparkle
 (`cal-reminder/Update/UpdateController.swift:14`). With `nil`, no client is constructed, no timer
 is scheduled, and no request is made. Both values ride the same road as the OAuth credentials and
 the Sparkle keys — an untracked `Secrets.xcconfig`, injected by CI, surfaced through `Info.plist`
 (TDR-007, SPEC-018). Whoever clones the repository has neither, so a Source Build is silent
 without anyone remembering to make it so.
 
-The key is also what separates a Distributed Build's reports from anonymous noise. It is a static
-shared secret in a binary whose source is public, so it authenticates nobody — anyone determined
-can extract it with `strings`. That is accepted, deliberately: the goal is to exclude Source
-Builds from the numbers and to raise the cost of casual abuse, not to prove provenance. Nothing
-commercial will ever be decided from it; the `build_channel` label exists so a future oddity can
-be segmented, not trusted. Real per-Install authentication arrives with subscriptions, as a
-key pair whose private half never ships.
+The key also separates a Distributed Build's reports from anonymous noise. It is a static shared
+secret in a binary whose source is public, so it authenticates nobody — anyone determined extracts
+it with `strings`. That is accepted deliberately: the goal is to exclude Source Builds from the
+numbers and to raise the cost of casual abuse, not to prove provenance. Nothing commercial will
+ever be decided from it.
 
-### What bounds the damage is the instance cap, not the key
+### What bounds the damage is the instance cap
 
 A public write endpoint on an autoscaling service turns a flood into an invoice. `--max-instances`
-is therefore not a tuning knob but part of the design: with a cap, the worst case is that
-Telemetry returns 503, which no user ever notices. Body-size limits, a per-batch event cap and a
-per-IP rate limit bound the rest. Cloud Armor would do better and costs money; it is out of scope
-until there is a reason.
+is therefore part of the design, not a tuning knob: with a cap, the worst case is that Telemetry
+returns 503, which no user ever notices. A body-size limit, a cap on events per batch and a
+per-IP rate limit bound the rest.
 
-### Why a direct exporter and not the Collector sidecar
+### Why a direct exporter and no Collector sidecar
 
-The sibling `personal-finance` project runs an OpenTelemetry Collector as a Cloud Run sidecar and
-routes metrics by name prefix to two backends. That pattern is right there and proven, and it is
-still **not** what this service starts with: one destination does not need a router, and a second
-container costs memory and cold start for a service that handles a few requests per day. The SDK
-exports straight to Cloud Monitoring, and Grafana reads Cloud Monitoring as a datasource. The
-migration path to the sidecar is one config file when a second destination appears — **TDR-008**.
+One destination does not need a router, and a sidecar costs memory and cold start on a service
+that handles a trickle. The SDK exports straight to Cloud Monitoring; Grafana reads Cloud
+Monitoring as a datasource. The migration path is one config file when a second destination
+appears — **TDR-008**.
 
 ## Affected modules
 | Module | Role in this feature | Generated SPEC |
 |--------|----------------------|----------------|
-| **Project Service** *(new, `service/`)* | Go service on Cloud Run: `/v1/events`, `/v1/state`, `/v1/crash`, `/internal/rollup`; owns the Firestore collection and the OTel export | SPEC-022 |
-| **Firestore** *(new integration)* | One document per Install — the state the rollup aggregates | SPEC-022 |
+| **Project Service** *(new, `service/`)* | Go service on Cloud Run: `/v1/events` and `/v1/crash`; owns the metric allowlist and the OTel export | SPEC-022 |
 | **Cloud Monitoring** *(new integration)* | Where every metric lands; Grafana reads it | SPEC-022 |
-| **TelemetryClient** *(new, app)* | Holds the Install identifier, accumulates the animation delta, sends both reports, honours the switch and the gate | SPEC-023 |
-| **OverlayPresenter** | Reports each Reminder animation played to the TelemetryClient | SPEC-023 |
-| **AppCoordinator** | Builds the TelemetryClient from configuration (or does not); supplies the Account and Calendar counts for `/v1/state` | SPEC-023 |
+| **TelemetryClient** *(new, app)* | Accumulates pending events, enforces the once-a-day rule, sends the batch, honours the switch and the gate | SPEC-023 |
+| **OverlayPresenter** | Reports each Reminder animation played | SPEC-023 |
+| **UpdateController / AppDelegate** | Reports that the running version changed since the last launch | SPEC-023 |
+| **AppCoordinator** | Builds the TelemetryClient from configuration, or does not | SPEC-023 |
 | **MenuBar UI** | States that Telemetry is on and offers the switch; carries the first-launch notice | SPEC-023 |
 | **CrashReporter** *(new, app)* | Finds the macOS crash report for its own process, asks, sends | SPEC-024 |
 
-New integrations: the Project Service, Firestore, Cloud Monitoring and Grafana Cloud.
-`architecture.md` gains them in the same change.
+New integrations: the Project Service, Cloud Monitoring and Grafana Cloud. No database, no
+scheduler. `architecture.md` gains them in the same change.
 
 ## Interfaces / contract (source of truth)
 
-**`POST /v1/events`** — hourly, skipped entirely when `planesFlown == 0`
+**`POST /v1/events`** — sent when the pending batch is non-empty, at most hourly
 ```
-{ "installId": "5f3c…", "appVersion": "1.4.2", "planesFlown": 3 }
+{ "appVersion": "1.4.2",
+  "macosMajor": "15",
+  "events": [ { "name": "planes_flown",     "value": 3 },
+              { "name": "daily_active",     "value": 1 },
+              { "name": "update_installed", "value": 1 } ] }
 → 202 Accepted   (no body)
 ```
 
-**`POST /v1/state`** — on launch, then every 24 h
+**Allowlist** — a name outside it is dropped, the rest of the batch still counts
 ```
-{ "installId": "5f3c…", "appVersion": "1.4.2", "macosVersion": "15.3",
-  "accounts": 2, "calendarsSelected": 5, "buildChannel": "distributed" }
-→ 200 { }        (the envelope that will later carry entitlements)
+planes_flown      counter · label app_version              · value 1..1000
+daily_active      counter · labels app_version, macos_major · value == 1
+update_installed  counter · label app_version              · value == 1
 ```
 
 **`POST /v1/crash`** — only after the user agrees, one report per request
 ```
-{ "installId": "5f3c…", "appVersion": "1.4.2", "macosVersion": "15.3",
-  "report": "<contents of the .ips file>" }
+{ "appVersion": "1.4.2", "macosMajor": "15", "report": "<contents of the .ips file>" }
 → 202 Accepted
 ```
 
-Every app-facing request carries `X-Telemetry-Key: <build-time key>`; a request without it is
-rejected with 401 and nothing is recorded.
-
-**`POST /internal/rollup`** — Cloud Scheduler only, OIDC-authenticated, never reachable publicly
-```
-→ 200 { "installs": 412, "active1d": 180, "active7d": 340, "active30d": 402 }
-```
-
-**Firestore — `installs/{installId}`**
-```
-firstSeen         : timestamp   // set once, on creation
-lastSeen          : timestamp   // /v1/state only — the liveness signal
-appVersion        : string
-macosVersion      : string
-accounts          : int         // absolute, restated daily
-calendarsSelected : int         // absolute, restated daily
-planesTotal       : int         // Increment(delta); convenience only, may drift
-buildChannel      : string
-```
+Every request carries `X-Telemetry-Key: <build-time key>`; without it, 401 and nothing recorded.
+**No request carries an identifier of any kind.**
 
 **Metrics**
-| Metric | Kind | Published by | Labels |
+| Metric | Kind | Labels | Answers |
 |---|---|---|---|
-| `planes_flown_total` | counter | `/v1/events` | `app_version` |
-| `state_reports_total` | counter | `/v1/state` | `app_version` |
-| `crash_reports_total` | counter | `/v1/crash` | `app_version` |
-| `accounts_per_install` | histogram | `/v1/state` | `app_version` |
-| `calendars_per_install` | histogram | `/v1/state` | `app_version` |
-| `installs_total` | gauge | rollup | — |
-| `installs_active_1d` / `_7d` / `_30d` | gauge | rollup | — |
-| `installs_new_1d` | gauge | rollup | — |
-| `installs_by_version` | gauge | rollup | `app_version` |
-| `accounts_connected_total` | gauge | rollup | — |
-| `calendars_selected_total` | gauge | rollup | — |
-
-`installId` is never a label, on any metric. It exists only inside Firestore and inside a crash
-report's storage path.
+| `planes_flown_total` | counter | `app_version` | Airplanes per hour / per day |
+| `daily_active_total` | counter | `app_version`, `macos_major` | Installs used that day, and on which version |
+| `update_installed_total` | counter | `app_version` | Installs that arrived at a version |
+| `crash_reports_total` | counter | `app_version` | Crashes, and where |
 
 **App-side configuration gate** — mirrors `UpdateConfiguration`
 ```
@@ -238,19 +198,19 @@ protocol TelemetryReporting: AnyObject {
     var isConfigured: Bool { get }     // false in a Source Build
     var isEnabled: Bool { get set }    // the menu bar switch (RF-17)
     func recordPlaneFlown()
-    func reportStateIfDue() async
+    func recordActiveToday()           // no-op when already sent for the current local day
+    func recordUpdateInstalled(to version: String)
 }
 ```
 
 ## Affected domain model
-- **Install** *(new)* — one copy of the app on one Mac; a random identifier in the Keychain, so
-  it survives reinstallation and can later anchor a subscription seat. The unit RNF-13 counts.
-- **Telemetry** *(new)* — two report shapes, events and state. Counts and versions only.
+- **Telemetry** *(new)* — a batch of named counter events. Counts and versions only, no identifier.
 - **Project Service** *(new)* — the only project-owned server the app talks to besides the
   Release host.
-- Unchanged: Account, Calendar, Event, Reminder, Trigger, Overlay. This design reads two
-  existing counts (connected Accounts, selected Calendars) and one existing occurrence (a
-  Reminder animation played). It changes nothing about how any of them work.
+- **Install** — still the unit being counted, but now counted **without being identified**: the
+  app reports at most one "used today" event per Install per day and the service just sums.
+- Unchanged: Account, Calendar, Event, Reminder, Trigger, Overlay. This design observes one
+  existing occurrence (a Reminder animation played) and changes nothing about any of them.
 
 ## Flow
 
@@ -259,77 +219,49 @@ sequenceDiagram
     autonumber
     participant A as App macOS
     participant S as Project Service
-    participant F as Firestore
     participant M as Cloud Monitoring
-    participant C as Cloud Scheduler
+    participant G as Grafana
 
-    Note over A: a Reminder animation plays -> local delta ++
+    Note over A: launch - first action of a new local day -> queue daily_active
+    Note over A: version changed since last launch -> queue update_installed
+    Note over A: a Reminder animation plays -> pending planes_flown ++
 
-    Note over A,M: events - hourly, only when the delta is greater than zero
-    A->>S: POST /v1/events - installId, appVersion, planesFlown
-    S->>M: planes_flown_total += delta
+    A->>S: POST /v1/events - appVersion, macosMajor, batch
+    S->>S: drop names outside the allowlist, validate ranges
+    S->>M: increment each counter
     S-->>A: 202
-    Note over A: the local delta is cleared only after the 202
+    Note over A: the pending batch is cleared only after the 202
 
-    Note over A,F: state - on launch and every 24h
-    A->>S: POST /v1/state - versions, accounts, calendarsSelected
-    S->>F: upsert installs/installId with lastSeen
-    S->>M: accounts_per_install / calendars_per_install samples
-    S-->>A: 200 - empty envelope for now
-
-    Note over C,M: rollup - once a day, single writer
-    C->>S: POST /internal/rollup with an OIDC token
-    S->>F: read every document
-    F-->>S: the fleet's current state
-    S->>M: gauges - active, total, new, by version, fleet totals
-    S-->>C: 200
+    G->>M: reads Cloud Monitoring as a datasource
 ```
 
 ## Decisions
-- **Two endpoints split by cadence, not by payload.** It removes the "write the database only if
-  stale" conditional and gives each handler a single destination.
-- **`lastSeen` comes only from `/v1/state`.** `/v1/events` vanishes when the app is idle, so it
-  cannot measure liveness. `/v1/state` therefore fires on launch and on elapsed time, never on a
-  wall-clock hour.
-- **The animation delta is cleared only after a `202`.** An offline or sleeping Mac accumulates
-  and reports late; an animation is never lost, only delayed.
-- **Absolute state, never deltas, for anything the dashboard aggregates.** See the rule in
-  §Analysis. `planesTotal` in Firestore is the one exception and is explicitly allowed to drift:
-  it is a convenience field for "is this Install a heavy user", and no dashboard number is derived
-  from it — the animation count comes from the counter metric.
-- **The rollup is a single daily writer.** It sidesteps the per-time-series write limit by
-  construction rather than by retry logic, and it produces one clean reading a day instead of a
-  sawtooth.
-- **The rollup reads every document.** Firestore has no `GROUP BY`, and at this scale reading the
-  whole collection costs far less than the free daily read quota. Above roughly 10 000 Installs
-  this must change — to one aggregation query per known version, or to counters maintained on
-  write. Recorded here so the change is made deliberately rather than discovered.
-- **Telemetry is on by default and switchable off; a crash report is asked for every time.**
-  Pure opt-in under-reports so badly that the numbers stop being usable, and an anonymous count is
-  a proportionate default for a paid app that says so on first launch. A crash report is different
-  in kind — it is a file whose contents the user should see before it leaves their Mac — so it
-  gets a decision per occurrence and never a standing permission.
-- **The Install identifier lives in the Keychain, not `UserDefaults`.** It must survive
-  reinstallation to make "new Install" mean something, and it is the anchor a subscription seat
-  will bind to.
-- **No Collector sidecar to start with** — TDR-008.
-- **The service lives in `service/`, in this repository, public.** There is nothing secret in it
-  beyond environment variables, and a backend anyone can read is the same argument RNF-12 already
-  makes about the app. It does make the project multi-part; `conventions.md` §A.1 is updated in
+- **No gauges, no database, no scheduled job.** Every number this design publishes is additive, so
+  it can be produced from the request that reports it. Everything that required seeing the whole
+  fleet at once was cut in §Analysis.
+- **No identifier, anywhere.** Nothing to deduplicate server-side means nothing to store, and the
+  privacy policy gets to say the reports contain no identifier at all.
+- **"Used today" is deduped on the client, by local calendar day.** A date comparison dedupes
+  exactly; an elapsed-time rule drifts.
+- **The pending batch is cleared only after a `202`.** An offline or sleeping Mac accumulates and
+  reports late; an animation is never lost, only delayed.
+- **Metric names come from a server-side allowlist.** A client that could invent a name could
+  invent time series, and time series cost money.
+- **One endpoint for every counter.** Adding a metric is an allowlist entry and a call site.
+- **The test animation does not count**, and neither does a relaunch on the same day.
+- **`--max-instances` is part of the design**, not an ops detail.
+- **The service lives in `service/`, in this repository, public.** Nothing secret in it beyond
+  environment variables. It does make the project multi-part; `conventions.md` §A.1 is updated in
   the same change.
 
 ## Out of scope / open questions
-- **Out — subscriptions, entitlements and feature locks.** The `/v1/state` response is an empty
-  envelope on purpose, so adding them later is additive.
-- **Out — per-Install authentication.** The static build-time key excludes Source Builds and
-  nothing more, and that is all this design claims. The key pair belongs with subscriptions.
-- **Out — the landing page, download counts and Homebrew installs.** GitHub and Homebrew already
-  publish those, with no code to write.
-- **Out — logs and traces.** Only metrics and crash reports. A log pipeline is a separate
-  decision with a separate privacy story.
-- **Open — how long crash reports are kept.** A crash report can contain more than a stack (paths,
-  loaded libraries). They are stored raw for symbolication, and the retention window is set in
-  SPEC-024 rather than here, but it is a privacy-policy fact, not an implementation detail.
-- **Open — the ratio between reporting and non-reporting Installs.** Anyone who turns Telemetry
-  off is invisible to every number, so all counts are lower bounds. There is no honest way to
-  correct for it; the dashboard should say so rather than pretend.
+- **Out — retention, cohorts, 7/30-day actives, total Installs ever.** Cut deliberately; see
+  §Analysis. They come back with subscriptions, which bring an identity of their own.
+- **Out — Accounts and Calendars per Install.** Interesting once, not worth a field.
+- **Out — subscriptions, entitlements, feature locks, per-Install authentication.**
+- **Out — logs and traces.** Metrics and crash reports only.
+- **Known — every count is a lower bound.** Anyone who switches Telemetry off is invisible, and
+  there is no honest way to correct for it. The dashboard should say so rather than pretend.
+- **Known — `daily_active_total` is not unique users.** One person with two Macs counts twice; one
+  Mac used by two people counts once. Stated on the dashboard.
+- **Open — how long crash reports are kept.** Set in SPEC-024, but it is a privacy-policy fact.

@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Designed how the project will see the app in the field: anonymous usage counts the user can switch off, crash reports sent only with consent, and a small service of the project's own that receives them — a build made from the source contacts none of it.
+- Designed how the project will see the app in the field: a handful of anonymous counts the user can switch off and that carry no identifier at all, crash reports sent only with consent, and a small stateless service of the project's own that receives them — a build made from the source contacts none of it.
 
 ## Release - v0.3.0 - 16-09-2026
 

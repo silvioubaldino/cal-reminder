@@ -41,9 +41,8 @@ Collector and no OTLP hop:
 - `go.opentelemetry.io/contrib/detectors/gcp` supplies the resource, which carries the Cloud Run
   instance identity — so each instance writes its own time series and the 5-second limit is
   satisfied by construction, the same property the Collector's `resourcedetection` provides.
-- `ForceFlush` on `SIGTERM`, and again at the end of the rollup handler, because Cloud Run freezes
-  an instance as soon as a response is written and a 60-second reader would otherwise lose the
-  batch.
+- `ForceFlush` on `SIGTERM`, because Cloud Run freezes an instance as soon as it goes idle and a
+  60-second reader would otherwise lose the batch.
 - Grafana Cloud reads Cloud Monitoring as a datasource instead of receiving its own copy.
 
 **Migration is explicit and cheap.** The moment a second destination or a second signal appears —

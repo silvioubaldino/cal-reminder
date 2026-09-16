@@ -39,7 +39,6 @@ flowchart TB
     keychain[("macOS Keychain")]
     rel[("Release host<br/>Appcast + .dmg")]
     svc[("Project Service<br/>Cloud Run")]
-    fs[("Firestore<br/>Installs")]
     mon[("Cloud Monitoring<br/>+ Grafana")]
 
     user -->|controls| ui
@@ -57,8 +56,7 @@ flowchart TB
     ui --> tel
     coord --> tel
     overlay -.->|animation played| tel
-    tel -->|HTTPS · events + state, only when configured| svc
-    svc --> fs
+    tel -->|HTTPS · counter events, only when configured| svc
     svc --> mon
 ```
 
@@ -69,7 +67,7 @@ flowchart TB
 | **cal-reminder** | The whole app; a background menu bar agent that syncs Events and draws the airplane Overlay | Swift 5.9+ · AppKit (`NSStatusItem`, `NSPanel`) · Core Animation · `URLSession`/`Codable` · Keychain Services · Xcode (`LSUIElement` bundle) |
 | **Google Calendar API** | Source of Events and Reminders (read-only) | Google Calendar REST v3 · OAuth 2.0 (Desktop/PKCE) |
 | **macOS Keychain** | Secure storage of the OAuth refresh token | Keychain Services |
-| **Project Service** | Receives Telemetry and crash reports from Distributed Builds, keeps one record per Install, and publishes the fleet metrics; later issues subscription entitlements | Go · Cloud Run · Firestore · OpenTelemetry SDK · Cloud Monitoring · Grafana Cloud (datasource) |
+| **Project Service** | Receives Telemetry and crash reports from Distributed Builds and publishes the counters; stateless, no database | Go · Cloud Run · OpenTelemetry SDK · Cloud Monitoring · Grafana Cloud (datasource) |
 | **Release host** | Serves the signed Appcast and the notarized `.dmg` the app updates itself from; also hosts the landing page and privacy policy | Static HTTPS hosting · GitHub Releases · Sparkle Appcast (EdDSA-signed) |
 
 ## Components (inside cal-reminder)
@@ -83,7 +81,7 @@ flowchart TB
 | **CalendarService** *(one per connected Account)* | List that Account's Calendars, Poll each selected one (per-Calendar sync), keep a local replica of each Calendar's Events and derive the complete Trigger set from it every Poll, parse Events, resolve the effective Reminders (Event's own + Extra Reminders) → Triggers | AYD-001, AYD-002, AYD-007, AYD-008, AYD-011 |
 | **Scheduler** | Precise local timers per Trigger + dedupe; reconciles the armed set against each Poll's complete result, scoped per Account; re-arms on wake instead of dropping | AYD-001, AYD-011 |
 | **OverlayPresenter** | `NSPanel` over all windows + animation + FIFO queue | AYD-001 |
-| **TelemetryClient** | Holds the Install identifier, counts Reminder animations, sends the hourly events report and the daily state report, honours the menu bar switch; inert when the build carries no configuration (Source Build) | AYD-012 |
+| **TelemetryClient** | Accumulates counter events — animations played, used today, update installed — and sends them as an hourly batch carrying no identifier; honours the menu bar switch; inert when the build carries no configuration (Source Build) | AYD-012 |
 | **UpdateController** | Checks the Appcast for a newer Release, verifies its signature against the embedded public key, installs with the user's consent; inert in a Source Build | AYD-009, TDR-006 |
 
 > Diagram and table must stay in sync — if they diverge, **the table wins**.

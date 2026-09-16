@@ -29,32 +29,36 @@ and shows an on-screen animation when one of your Events' Reminders is due.
 - The app does **not** sell, share, or transmit your calendar or account data to any third
   party. Calendar traffic goes directly between your Mac and Google's own servers (for sign-in
   and calendar sync), and never to us.
-- The app does **not** track you and does not use your data for advertising. It does send us
-  anonymous usage counts, described below, which you can switch off.
+- The app does **not** track you and does not use your data for advertising. It does send us a
+  few anonymous counts, described below, which you can switch off.
 
 ## What we receive
 
-The version of the app downloaded from our site runs a small service of ours so we can tell how
-the app is doing in the field. It sends two kinds of report:
+The version of the app downloaded from our site sends us a small number of counts, so we can tell
+whether the app is working and whether a new version reached people. It sends three things:
 
-- **Usage counts**, roughly hourly and once a day: how many Reminder animations played, how many
-  Google accounts you have connected, how many calendars you selected, and which versions of the
-  app and of macOS you are running.
-- **A random identifier** generated the first time the app runs, so we can tell one installation
-  from another. It is not derived from you, your Mac or your Google account, and it lets us count
-  installations, nothing more.
+- **How many times the Reminder animation played.**
+- **One "used today" signal per day**, the first time you open the app or it shows you a Reminder.
+- **One signal when an update has been installed.**
+
+Each of these carries the version of the app and of macOS you are running, and nothing else.
+
+There is **no identifier** in any of it. We do not generate one, do not store one, and do not send
+one — so we cannot tell one Mac from another, cannot follow the same installation from one day to
+the next, and cannot connect anything we receive to you. We do not keep the IP address the report
+arrived from either. What we end up with is a daily number, such as "412 installations were used
+today, 380 of them on version 1.4.2". You can switch it off from the menu bar at any time.
 
 These reports never contain your calendar events, your calendar names, your email address, or
-anything you typed. We do not keep the IP address the report arrived from. You can switch usage
-reporting off at any time from the menu bar, and the app will stop sending it.
+anything you typed.
 
 **Crash reports** are separate and always ask first. If the app crashes, macOS writes a technical
 report about it. On the next launch we show you that report and ask whether to send it. Nothing is
-sent unless you say yes, we ask again for each new crash rather than remembering an answer, and
-what we receive is kept for 90 days and then deleted.
+sent unless you say yes, we ask again for each new crash rather than remembering an answer, the
+report carries no identifier either, and what we receive is kept for 90 days and then deleted.
 
 **If you build the app yourself** from our public source code, none of this happens: with no
-configuration of ours in the build, the app contacts no server of ours at all — no usage reports,
+configuration of ours in the build, the app contacts no server of ours at all — no usage counts,
 no crash reports, and no update checks.
 
 ## What is stored, and where
@@ -65,8 +69,8 @@ no crash reports, and no update checks.
   alerted on) are stored locally on your Mac using standard macOS app preferences.
 - No calendar content or account data is retained beyond what is needed to compute and show
   upcoming Reminders.
-- The random installation identifier described above is stored in the macOS Keychain on your Mac,
-  alongside the usage counts waiting to be sent.
+- The counts waiting to be sent are held locally on your Mac until they are delivered, and
+  discarded once they are.
 
 ## Your controls
 
@@ -74,7 +78,7 @@ no crash reports, and no update checks.
   revokes local access to the stored token.
 - You can choose which Calendars generate Reminders, or turn the app off entirely, from the
   menu bar.
-- You can switch off usage reporting from the menu bar, and you can decline any crash report.
+- You can switch off the usage counts from the menu bar, and you can decline any crash report.
 
 ## Contact
 

@@ -11,8 +11,8 @@ related: [SPEC-022, SPEC-023, RF-18, RNF-13, GLO, REQ-01]
 
 > Implements RF-18: after an abnormal termination the app finds the crash report macOS itself
 > wrote, shows the user what it contains, and sends it only if they agree. Depends on
-> **SPEC-023** for the Install identifier and the configuration gate, and on **SPEC-022** for
-> `/v1/crash`.
+> **SPEC-023** for the configuration gate and the HTTP boundary, and on **SPEC-022** for
+> `/v1/crash`. Like every other report, it carries **no identifier**.
 
 ## What (goal)
 1. On launch, find crash reports macOS wrote for this app since the last check.
@@ -72,7 +72,8 @@ Scenario: Only this app's reports are read
 1. `CrashReportScanner`: find candidates, filter by process and timestamp.
 2. `CrashReportStore`: the handled set and the last-check timestamp in `UserDefaults`.
 3. The consent window, shown at most once per launch, queued if several reports are pending.
-4. Send through the Telemetry client's HTTP boundary, reusing `X-Telemetry-Key`.
+4. Send through the Telemetry client's HTTP boundary, reusing `X-Telemetry-Key`; the payload
+   carries the app and macOS versions and the report, and nothing else.
 5. A lifecycle rule on the storage bucket that deletes reports after 90 days.
 6. Privacy policy: what a crash report contains, that it is only sent on agreement, how long it
    is kept.
@@ -92,3 +93,4 @@ Scenario: Only this app's reports are read
 - [ ] Nothing is sent without an explicit per-report agreement
 - [ ] Reports for other processes are never read
 - [ ] The retention window is implemented and stated in the privacy policy
+- [ ] The payload carries no identifier
