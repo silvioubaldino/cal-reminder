@@ -3,7 +3,7 @@ id: CHANGELOG
 type: changelog
 title: Changelog
 status: approved
-updated: 2026-09-11
+updated: 2026-09-16
 ---
 
 # Changelog
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Designed how the project will see the app in the field: anonymous usage counts the user can switch off, crash reports sent only with consent, and a small service of the project's own that receives them — a build made from the source contacts none of it.
 
 ## Release - v0.3.0 - 16-09-2026
 

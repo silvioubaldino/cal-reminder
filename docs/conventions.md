@@ -3,14 +3,16 @@ id: CONV
 type: conventions
 title: Docs and code conventions
 status: approved
-updated: 2026-07-16
+updated: 2026-09-16
 ---
 
 # Conventions
 
 The "contract" that keeps docs and code consistent and readable by humans and AIs.
-`cal-reminder` is a **single-part** project (one native macOS app), so there is no
-cross-part split — IDs are global and carry **no `@part` suffix**. Two sections:
+`cal-reminder` has **two code roots** — the native macOS app (`cal-reminder/`) and the Project
+Service (`service/`, AYD-012) — but a **single documentation trunk**: one set of requirements,
+one glossary, one architecture, and IDs that are global across both. There is still **no
+`@part` suffix** on any ID; a doc says which root it touches in its own text. Two sections:
 **A) documentation** and **B) code**.
 
 ---
@@ -18,7 +20,9 @@ cross-part split — IDs are global and carry **no `@part` suffix**. Two section
 ## A. Documentation
 
 ### A.1 Document types, IDs, and where they live
-ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed).
+ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed). The numbering is
+shared by both code roots — a SPEC for the Project Service and a SPEC for the app draw from the
+same sequence.
 
 | Prefix | Type | Where |
 |---------|------|------|
@@ -32,7 +36,7 @@ ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed).
 
 ### A.2 Referencing
 IDs are **global** across the project. Reference another doc by its plain ID
-(`AYD-003`, `SPEC-012`, `REQ-01`). No `@part` suffix (single-part project).
+(`AYD-003`, `SPEC-012`, `REQ-01`). No `@part` suffix, in either code root.
 
 ### A.3 Frontmatter (required in every doc)
 ```yaml
@@ -102,7 +106,9 @@ as the canonical source. Current topology → `architecture.md`; a feature's flo
 
 ### B.1 Style
 - **Naming:** use the glossary's terms — always in **English** (variables, functions,
-  types, entities). Comments may be in English.
+  types, entities), in Swift and in Go alike. Comments may be in English.
+- **Roots:** `cal-reminder/` is the macOS app (Swift); `service/` is the Project Service (Go).
+  Each root keeps its own linter, formatter and test command; CI runs both.
 - **Linter/formatter:** keep configuration and command standardized across the project.
 
 ### B.2 Tests
