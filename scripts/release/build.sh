@@ -11,10 +11,14 @@
 #
 # The Appcast feed URL and EdDSA public key come from the environment too: they are not
 # secret, but without them the Distributed Build ships with no update configuration and
-# Sparkle disables itself (AYD-009), so they are required rather than optional.
+# Sparkle disables itself (AYD-009), so they are required rather than optional. The Project
+# Service endpoint and key follow the same reasoning (AYD-013): every Distributed Build is
+# meant to report Telemetry, so a release missing them fails loudly here rather than shipping
+# silently as if it were a Source Build.
 #
 # Required environment: DEVELOPMENT_TEAM, CODE_SIGN_IDENTITY, GOOGLE_OAUTH_CLIENT_ID,
-# GOOGLE_OAUTH_CLIENT_SECRET, SPARKLE_FEED_URL, SPARKLE_PUBLIC_ED_KEY.
+# GOOGLE_OAUTH_CLIENT_SECRET, SPARKLE_FEED_URL, SPARKLE_PUBLIC_ED_KEY, TELEMETRY_ENDPOINT,
+# TELEMETRY_KEY.
 set -eu
 
 cd "$(dirname "$0")/../.."
@@ -23,7 +27,7 @@ VERSION="${1:?usage: build.sh <version> <build-number>}"
 BUILD_NUMBER="${2:?usage: build.sh <version> <build-number>}"
 
 for var in DEVELOPMENT_TEAM CODE_SIGN_IDENTITY GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET \
-           SPARKLE_FEED_URL SPARKLE_PUBLIC_ED_KEY; do
+           SPARKLE_FEED_URL SPARKLE_PUBLIC_ED_KEY TELEMETRY_ENDPOINT TELEMETRY_KEY; do
   eval "value=\${$var:-}"
   if [ -z "$value" ]; then
     echo "build.sh: missing required environment variable $var" >&2
@@ -40,6 +44,8 @@ escape_slashes() {
 
 FEED_URL_VALUE="$(escape_slashes "$SPARKLE_FEED_URL")"
 PUBLIC_ED_KEY_VALUE="$(escape_slashes "$SPARKLE_PUBLIC_ED_KEY")"
+TELEMETRY_ENDPOINT_VALUE="$(escape_slashes "$TELEMETRY_ENDPOINT")"
+TELEMETRY_KEY_VALUE="$(escape_slashes "$TELEMETRY_KEY")"
 
 BUILD_DIR="build"
 ARCHIVE_PATH="$BUILD_DIR/cal-reminder.xcarchive"
@@ -59,6 +65,8 @@ CURRENT_PROJECT_VERSION = $BUILD_NUMBER
 SLASH = /
 SPARKLE_FEED_URL = $FEED_URL_VALUE
 SPARKLE_PUBLIC_ED_KEY = $PUBLIC_ED_KEY_VALUE
+TELEMETRY_ENDPOINT = $TELEMETRY_ENDPOINT_VALUE
+TELEMETRY_KEY = $TELEMETRY_KEY_VALUE
 EOF
 
 xcodegen generate

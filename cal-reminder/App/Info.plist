@@ -40,5 +40,9 @@
 	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
+	<key>TelemetryEndpoint</key>
+	<string>$(TELEMETRY_ENDPOINT)</string>
+	<key>TelemetryKey</key>
+	<string>$(TELEMETRY_KEY)</string>
 </dict>
 </plist>

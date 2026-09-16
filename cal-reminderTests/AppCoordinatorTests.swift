@@ -226,6 +226,19 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(scheduler.reconcileCalls.last?.triggers.map(\.id), ["evt1#5"])
     }
 
+    func test_wakeCallsOnWake_beforeRePolling() async {
+        // AYD-013: the app's own "used today" liveness signal is decided on wake, since a Mac
+        // that slept overnight and wakes with the app still running never relaunches.
+        let accounts = FakeAccountsManaging()
+        let coordinator = makeCoordinator(accounts: accounts)
+        var onWakeCalled = false
+        coordinator.onWake = { onWakeCalled = true }
+
+        await coordinator.handleWake()
+
+        XCTAssertTrue(onWakeCalled)
+    }
+
     func test_calendarsChangedRebuildsTriggersWithAFullResync() async throws {
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)

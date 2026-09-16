@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let flightSpeedStore = UserDefaultsFlightSpeedStore()
     private let skipOnClickStore = UserDefaultsSkipOnClickStore()
     private let reminderSettingsStore = UserDefaultsReminderSettingsStore()
+    private let telemetrySettingsStore = UserDefaultsTelemetrySettingsStore()
+    private var telemetryClient: TelemetryClient?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let updateConfiguration = UpdateConfiguration.make(
@@ -15,12 +17,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let updateController = UpdateController(configuration: updateConfiguration)
 
+        // The first-launch notice runs synchronously, before the client's timer is ever
+        // started, so nothing can be sent before the user has seen it (RF-17).
+        let telemetryConfiguration = TelemetryConfiguration.make(
+            endpoint: Bundle.main.object(forInfoDictionaryKey: "TelemetryEndpoint") as? String,
+            key: Bundle.main.object(forInfoDictionaryKey: "TelemetryKey") as? String
+        )
+        if let telemetryConfiguration {
+            TelemetryFirstLaunchNotice.presentIfNeeded(settingsStore: telemetrySettingsStore)
+            let client = TelemetryClient(configuration: telemetryConfiguration, settingsStore: telemetrySettingsStore)
+            telemetryClient = client
+        }
+
         let overlayPresenter = OverlayPresenter(
             animator: DefaultOverlayAnimator(speedStore: flightSpeedStore, skipOnClickStore: skipOnClickStore)
         )
 
         let accountRegistry = Self.makeAccountRegistry(reminderSettingsStore: reminderSettingsStore)
-        let scheduler = Scheduler(onFire: { trigger in
+        let scheduler = Scheduler(onFire: { [telemetryClient] trigger in
+            // Only a Trigger that actually fired reaches here — the test animation is enqueued
+            // directly by AppCoordinator.testAnimation() and never goes through the Scheduler,
+            // so it never counts (SPEC-023).
+            telemetryClient?.recordPlaneFlown()
+            telemetryClient?.recordActiveToday()
             Task { await overlayPresenter.enqueue(trigger) }
         })
 
@@ -29,6 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             scheduler: scheduler,
             overlay: overlayPresenter
         )
+        coordinator.onWake = { [telemetryClient] in
+            telemetryClient?.recordActiveToday()
+        }
         self.coordinator = coordinator
 
         let statusMenuController = StatusMenuController(
@@ -60,7 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             calendarSelectionStore: { UserDefaultsCalendarSelectionStore(accountId: $0) },
             skipOnClickStore: skipOnClickStore,
             reminderSettingsStore: reminderSettingsStore,
-            updateController: updateController
+            updateController: updateController,
+            telemetry: telemetryClient
         )
         self.statusMenuController = statusMenuController
 
@@ -71,6 +94,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.setUpdateStatus(
             updateController.isConfigured ? .configured(version: updateController.currentVersion) : .sourceBuild
         )
+
+        telemetryClient?.recordInstallationIfChanged()
+        telemetryClient?.recordActiveToday()
+        telemetryClient?.start()
 
         guard GoogleOAuthConfig.bundled != nil else {
             coordinator.setOAuthConfigured(false)

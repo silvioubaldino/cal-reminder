@@ -41,6 +41,8 @@ targets:
         GoogleOAuthClientSecret: $(GOOGLE_OAUTH_CLIENT_SECRET)
         SUFeedURL: $(SPARKLE_FEED_URL)
         SUPublicEDKey: $(SPARKLE_PUBLIC_ED_KEY)
+        TelemetryEndpoint: $(TELEMETRY_ENDPOINT)
+        TelemetryKey: $(TELEMETRY_KEY)
         SUScheduledCheckInterval: 86400
         # Under the App Sandbox Sparkle's installer has to run out of process (AYD-010).
         # The service backing it ships inside Sparkle.framework and is opted into here;

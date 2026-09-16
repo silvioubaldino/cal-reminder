@@ -17,7 +17,9 @@ final class StatusMenuController {
     private let skipOnClickStore: SkipOnClickStoring
     private let reminderSettingsStore: ReminderSettingsStoring
     private let updateController: Updating
+    private let telemetry: TelemetryReporting?
     private var updateItems: [NSMenuItem] = []
+    private var telemetryItems: [NSMenuItem] = []
     private var speedItems: [FlightSpeed: NSMenuItem] = [:]
     private var colorItems: [BannerColor: NSMenuItem] = [:]
     private var matchCalendarColorItem: NSMenuItem!
@@ -46,7 +48,8 @@ final class StatusMenuController {
         calendarSelectionStore: @escaping (String) -> CalendarSelectionStoring = { UserDefaultsCalendarSelectionStore(accountId: $0) },
         skipOnClickStore: SkipOnClickStoring = UserDefaultsSkipOnClickStore(),
         reminderSettingsStore: ReminderSettingsStoring = UserDefaultsReminderSettingsStore(),
-        updateController: Updating = UpdateController(configuration: nil)
+        updateController: Updating = UpdateController(configuration: nil),
+        telemetry: TelemetryReporting? = nil
     ) {
         self.onTestAnimation = onTestAnimation
         self.onToggleEnabled = onToggleEnabled
@@ -63,6 +66,7 @@ final class StatusMenuController {
         self.skipOnClickStore = skipOnClickStore
         self.reminderSettingsStore = reminderSettingsStore
         self.updateController = updateController
+        self.telemetry = telemetry
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "airplane",
@@ -87,6 +91,10 @@ final class StatusMenuController {
         refreshItem.isEnabled = !state.refreshing
 
         setupGuideItem.isHidden = state.oauthConfigured
+
+        if let telemetry, let item = telemetryItems.first {
+            item.state = telemetry.isEnabled ? .on : .off
+        }
 
         accountsMenuItem.submenu = AccountsMenuBuilder.accountsMenu(
             for: state.accounts,
@@ -153,6 +161,17 @@ final class StatusMenuController {
         )
         for item in updateItems {
             menu.addItem(item)
+        }
+
+        telemetryItems = TelemetryMenuBuilder.items(
+            for: telemetry,
+            onToggle: { [weak self] in self?.handleToggleTelemetry() }
+        )
+        if !telemetryItems.isEmpty {
+            menu.addItem(.separator())
+            for item in telemetryItems {
+                menu.addItem(item)
+            }
         }
 
         menu.addItem(.separator())
@@ -281,5 +300,11 @@ final class StatusMenuController {
         let newValue = !updateController.automaticallyChecks
         updateController.automaticallyChecks = newValue
         updateItems.last?.state = newValue ? .on : .off
+    }
+
+    private func handleToggleTelemetry() {
+        guard let telemetry else { return }
+        telemetry.isEnabled.toggle()
+        telemetryItems.first?.state = telemetry.isEnabled ? .on : .off
     }
 }

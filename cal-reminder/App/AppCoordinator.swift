@@ -11,6 +11,9 @@ final class AppCoordinator {
 
     private(set) var state = AppState()
     var onStateChange: ((AppState) -> Void)?
+    /// Fires on every wake from sleep, before the re-sync poll — the app's own liveness
+    /// signal (AYD-013), set by AppDelegate to `telemetryClient?.recordActiveToday`.
+    var onWake: (() -> Void)?
 
     init(
         accounts: AccountsManaging,
@@ -117,6 +120,7 @@ final class AppCoordinator {
     }
 
     func handleWake() async {
+        onWake?()
         await scheduler.rearmAll()
         await poll()
     }
