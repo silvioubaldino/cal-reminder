@@ -5,7 +5,7 @@ title: Requirements and glossary
 status: approved
 updated: 2026-09-16
 parents: []
-children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010, AYD-011, AYD-012]
+children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010, AYD-011, AYD-013]
 related: [GLO]
 ---
 
@@ -56,7 +56,7 @@ related: [GLO]
 | RNF-10 | Security (app credential) | The **app's** OAuth client secret is not exposed | Two levels. **Now (must):** the secret is not in the repository at all — the source is public (RNF-12), so it is injected at build time and ships only in the Distributed Build (TDR-007). **Target:** the token exchange/refresh runs behind an app-owned backend (token broker) so the secret never ships in a binary either; auto-update (RF-16) makes rotating it a same-day operation instead of a reinstall (AYD-009) |
 | RNF-11 | Security (update channel) | An update can only come from the project | Every Release is EdDSA-signed and its Appcast served over HTTPS; the app refuses any update whose signature does not verify against the public key embedded in the binary, so control of the feed or of the download host is not enough to ship code to a user's machine. The private signing key exists only in a Keychain and as a CI secret, never in the repository (AYD-009, TDR-006) |
 | RNF-12 | Distribution model | Source-available, sold on trust | The repository builds and runs the app with **every capability that exists in the source**: no purchase, no license key, no trial timer, and no call to a project-owned server that gates functionality. Any subscription lock the Distributed Build carries is visible in the source and removable by whoever builds it — what is sold is never a secret. The builder supplies their own Google OAuth client (TDR-007). What a purchase buys is the Distributed Build's convenience — signed, notarized, credentials included, auto-updating — and, once subscriptions ship, the entitlements it unlocks. The repository is licensed under PolyForm Shield 1.0.0 (`LICENSE.md`): free to clone, build and use for any purpose, but not to redistribute as a competing product |
-| RNF-13 | Observability | The project can tell how the app is doing in the field, without collecting anything about anyone | A dashboard shows Reminder animations played, Installs used each day by app and macOS version, and installations split into first installs and updates, with at least 12 months of history. Reports carry **no identifier** and no IP is retained, so nothing can be followed across reports. Daily counts are read one day at a time — summed over a longer window they are Install-days, not distinct Installs — and every count is a lower bound because Telemetry can be switched off; the dashboard states both. A build with **no** Project Service configuration makes **no** request to any project-owned server, covered by an automated test (AYD-012) |
+| RNF-13 | Observability | The project can tell how the app is doing in the field, without collecting anything about anyone | A dashboard shows Reminder animations played, Installs used each day by app and macOS version, and installations split into first installs and updates, with at least 12 months of history. Reports carry **no identifier** and no IP is retained, so nothing can be followed across reports. Daily counts are read one day at a time — summed over a longer window they are Install-days, not distinct Installs — and every count is a lower bound because Telemetry can be switched off; the dashboard states both. A build with **no** Project Service configuration makes **no** request to any project-owned server, covered by an automated test (AYD-013) |
 
 ## Business rules
 - RN-01: Only timed Events generate Triggers; all-day Events are ignored.
@@ -92,9 +92,9 @@ through the Mac App Store (RNF-07). Two user paths, one codebase:
 The remaining work sits in independent AYDs, each with a defined boundary: **AYD-009** (direct
 distribution, release pipeline & auto-update — RF-16, RNF-07, RNF-11, RNF-12), **AYD-010** (signing,
 sandbox and the compliance artifacts that survive outside the store — RNF-08), **AYD-004** (CI &
-code-quality gate — RNF-09, already shipped) and **AYD-012** (the Project Service and the
+code-quality gate — RNF-09, already shipped) and **AYD-013** (the Project Service and the
 observability it exists for — RF-17, RNF-13). AYD-009 depends on the signing configuration
-AYD-010 defines; AYD-012 depends on the build-time configuration TDR-007 introduced. RF-18 (crash
+AYD-010 defines; AYD-013 depends on the build-time configuration TDR-007 introduced. RF-18 (crash
 logs) has no AYD yet.
 
 The **revoked direction.** RNF-07 previously targeted the Mac App Store (AYD-003, AYD-005). It is

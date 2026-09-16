@@ -3,15 +3,15 @@ id: SPEC-023
 type: spec
 status: draft
 updated: 2026-09-16
-parents: [AYD-012]
-related: [SPEC-022@service, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
+parents: [AYD-013]
+related: [SPEC-024@service, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
 ---
 
 # SPEC-023: Telemetry client in the app — what + how
 
-> Implements the app half of AYD-012: three counter events, the once-a-day rule, the menu bar
+> Implements the app half of AYD-013: three counter events, the once-a-day rule, the menu bar
 > switch, and the configuration gate that keeps a **Source Build** silent. Depends on
-> `SPEC-022@service` for the endpoint and on **SPEC-018** for the untracked config the endpoint
+> `SPEC-024@service` for the endpoint and on **SPEC-018** for the untracked config the endpoint
 > and key land in.
 
 ## What (goal)
@@ -27,7 +27,7 @@ related: [SPEC-022@service, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
 4. With no `TELEMETRY_ENDPOINT` or no `TELEMETRY_KEY` in the build, no request is ever made —
    proven by a test, because it is what RNF-13 promises about a Source Build.
 
-Out of scope: everything AYD-012 lists under §Out of scope.
+Out of scope: everything AYD-013 lists under §Out of scope.
 
 ## Acceptance criteria
 ```gherkin

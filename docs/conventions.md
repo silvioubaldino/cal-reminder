@@ -20,8 +20,8 @@ code conventions and changelog. Two sections: **A) documentation** and **B) code
 
 ### A.1 Document types, IDs, and where they live
 ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed). The numbering is one
-sequence across the **whole product**: a number is never reused, so `SPEC-022` exists in the
-service repo and nowhere else.
+sequence across the **whole product**: a number is never reused, so a given `SPEC-NNN` exists
+in exactly one repo, never both.
 
 | Prefix | Type | Where |
 |---------|------|------|
@@ -36,8 +36,10 @@ service repo and nowhere else.
 ### A.2 Referencing
 IDs are **global** across the product. Reference another doc by its plain ID
 (`AYD-003`, `SPEC-012`, `REQ-01`). A reference that **crosses repos** carries the repo:
-`SPEC-022@service` from here, `AYD-012@cal-reminder` from there. Within a repo, the plain ID
-is enough.
+`SPEC-NNN@service` from here, `AYD-NNN@cal-reminder` from there. Within a repo, the plain ID
+is enough. **Before assigning a new ID, check both repos** — the sequence has no central
+allocator, so two branches can pick the same free number; the one that lands on `main` second
+renumbers.
 
 ### A.3 Frontmatter (required in every doc)
 ```yaml

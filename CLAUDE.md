@@ -45,7 +45,7 @@ cross-repo design) that the sibling repo `cal-reminder-service` mirrors. Documen
 - **AYDs are append-only**: never rewrite a past AYD — supersede/override it with a new one
   (`supersedes` / `superseded_by`). Only its `status`/`superseded_by` may change (like a TDR).
 - References use the plain ID (`SPEC-012`, `AYD-003`). A reference that crosses into the
-  service repo carries it: `SPEC-022@service`. IDs are one global sequence across both repos.
+  service repo carries it: `SPEC-024@service`. IDs are one global sequence across both repos.
 - All docs are written in **English**.
 - Changed a **living** doc (REQ/GLO/ARCH/CONV)? Update `updated` and mark affected `children`
   as `status: review`. (AYDs aren't living — supersede them instead, see above.)

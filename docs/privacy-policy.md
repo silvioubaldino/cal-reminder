@@ -4,7 +4,7 @@ type: privacy-policy
 title: Privacy Policy
 status: approved
 updated: 2026-09-16
-related: [AYD-010, AYD-012, GLO]
+related: [AYD-010, AYD-013, GLO]
 ---
 
 # Privacy Policy — cal-reminder
