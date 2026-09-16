@@ -27,7 +27,7 @@ related: [SPEC-022, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
 4. With no `TELEMETRY_ENDPOINT` or no `TELEMETRY_KEY` in the build, no request is ever made —
    proven by a test, because it is what RNF-13 promises about a Source Build.
 
-Out of scope: crash reporting — AYD-012 takes it out of scope entirely.
+Out of scope: everything AYD-012 lists under §Out of scope.
 
 ## Acceptance criteria
 ```gherkin
@@ -115,21 +115,17 @@ Scenario: The test animation does not count
 ## How (approach)
 - **`TelemetryConfiguration.make(endpoint:key:)` mirrors `UpdateConfiguration.make`**
   (`cal-reminder/Update/UpdateController.swift:14`): `nil` when either value is missing, and
-  `AppCoordinator` simply does not build a client. This is the gate; nothing downstream needs to
-  know what a Source Build is.
+  `AppCoordinator` does not build a client.
 - **The pending batch is persisted** in `UserDefaults` so a quit or a crash does not lose it, and
   is cleared only after a `202`.
-- **The daily rule is a stored date**, compared against today in the current local calendar — not
-  an elapsed-time check, which drifts. It is checked from four places (launch, wake, animation,
-  timer tick) and is idempotent, so extra call sites are free: the timer is the guarantee, launch
-  and wake make it prompt. Wake is the one that matters — a menu bar agent that starts at login
-  rarely relaunches.
+- **The daily rule is a stored date**, compared against today in the current local calendar. It is
+  checked from four places — launch, wake, animation, timer tick — and is idempotent.
 - **The installation rule is a stored version string**: absent means `first_install`, different
   means `update`, equal means nothing.
-- **One timer**, hourly, that sends only when the batch is non-empty; a failure just waits for the
-  next tick, with no retry storm.
+- **One timer**, hourly, that sends only when the batch is non-empty; a failure waits for the next
+  tick, with no retry.
 - **Settings follow `UpdateSettings.swift`**: a `TelemetrySettingsStoring` protocol with a
-  `UserDefaults` implementation, so the tests inject a fake.
+  `UserDefaults` implementation.
 
 ## Steps
 1. `TelemetryConfiguration` + the `Info.plist` keys, added to `Config/Secrets.example.xcconfig`
@@ -159,8 +155,8 @@ Scenario: The test animation does not count
   call sites (idempotent within a day); the installation rule for absent, different and equal
   stored versions; the pending batch across failure, success and relaunch;
   `TelemetryConfiguration.make` with each field missing.
-- **The Source Build test is the important one:** with a `nil` configuration, assert the fake HTTP
-  client recorded **zero** requests over a full simulated day, including launch. RNF-13 names it.
+- **Source Build:** with a `nil` configuration, assert the fake HTTP client recorded **zero**
+  requests over a full simulated day, including launch (RNF-13).
 
 ## Checklist
 - [ ] No identifier is generated, stored or sent anywhere

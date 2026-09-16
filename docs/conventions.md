@@ -95,7 +95,17 @@ to `superseded` and set its `superseded_by`, and point new SPECs at the new AYD.
 All docs are written in **English**, including entities, fields, enums, and events
 (these carry through to the code). The glossary defines the canonical term for each concept.
 
-### A.9 Diagrams
+### A.9 Only what was decided
+A doc states the decision, not the road to it. Keep what someone needs to build or use the thing:
+contracts, behavior, acceptance criteria, constraints, and the reason a decision is non-obvious —
+one or two lines, where it prevents the next person undoing it by accident. Cut the rest: the
+history of the discussion, options weighed and dropped, and features the project decided against.
+
+Two exceptions. A **TDR** exists to record a choice, so its `Alternatives & trade-offs` stays —
+one line per alternative. And anything a reader might reasonably expect to find belongs under a
+short **Out of scope** list, so its absence reads as a decision rather than an oversight.
+
+### A.10 Diagrams
 **Mermaid embedded in the `.md`** (version-controlled, renders on GitHub) — never a PNG
 as the canonical source. Current topology → `architecture.md`; a feature's flow → its
 `AYD`. If the diagram diverges from the text, **the text wins**.

@@ -22,8 +22,7 @@ related: [TDR-008, RNF-13, RF-17, GLO, REQ-01]
 3. Every metric is published to Cloud Monitoring per TDR-008 and visible on a Grafana dashboard.
 4. The service cannot run up a bill under flood.
 
-Out of scope: the app-side client (SPEC-023); crash reporting, which AYD-012 takes out of scope
-entirely; anything to do with subscriptions.
+Out of scope: the app-side client (SPEC-023); everything AYD-012 lists under §Out of scope.
 
 ## Acceptance criteria
 ```gherkin
@@ -80,16 +79,13 @@ Scenario: No request carries an identifier
 ## How (approach)
 - **One Go service, `service/`**, standard library routing; handlers validate and increment,
   nothing else. No persistence layer at all.
-- **The allowlist is a table in code** — name, permitted label set, permitted value range — and it
-  is the only thing that decides whether an event becomes a time series.
+- **The allowlist is a table in code** — name, permitted label set, permitted value range.
 - **Metrics via the OTel SDK straight to Cloud Monitoring** (TDR-008): `PeriodicReader` at 60 s,
   `contrib/detectors/gcp` for the resource so each Cloud Run instance writes its own series, and
   `ForceFlush` on `SIGTERM`.
-- **Answer first, record after**: `/v1/events` answers `202` and does its work on a
-  context detached from the request, the way `personal-finance` does it. Telemetry must never
-  surface as a 4xx because of one bad event.
-- **Client IPs are excluded from the service's logs**, so "we do not keep the IP" is true rather
-  than aspirational.
+- **Answer first, record after**: `/v1/events` answers `202` and does its work on a context
+  detached from the request. One bad event never fails the batch.
+- **Client IPs are excluded from the service's logs.**
 
 ## Steps
 1. `service/` skeleton: `main.go`, config from the environment, `/healthz`, graceful shutdown with
@@ -115,7 +111,6 @@ Scenario: No request carries an identifier
 - **Acceptance:** one test per Gherkin scenario, with the metric recorder faked at the boundary.
 - **Unit:** the allowlist validator — unknown name, unknown `kind`, value below and above each
   range, bad `appVersion` pattern, label set enforcement.
-- **Not mocked:** the validator itself, which is the part that protects the bill.
 
 ## Checklist
 - [ ] No payload and no log line carries an identifier
