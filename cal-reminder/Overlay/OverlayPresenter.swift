@@ -35,7 +35,7 @@ final class DefaultOverlayAnimator: OverlayAnimating {
     func bannerBackgroundColor(for calendarColorHex: String?) -> NSColor {
         guard matchCalendarColorStore.matchCalendarColor,
               let calendarColorHex,
-              let color = NSColor(bannerHex: calendarColorHex) else {
+              let color = NSColor(bannerHex: CalendarPalette.displayedHex(for: calendarColorHex)) else {
             return colorStore.bannerColor.color
         }
         return color

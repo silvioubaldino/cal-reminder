@@ -1,13 +1,13 @@
 ---
 id: AYD-006
 type: design
-status: approved
-updated: 2026-08-14
+status: superseded
+updated: 2026-09-11
 parents: [REQ-01]
 children: [SPEC-014]
 related: [GLO, AYD-001, AYD-002]
 supersedes: []
-superseded_by: null
+superseded_by: AYD-012
 ---
 
 # AYD-006: Banner painted with the Calendar Color
