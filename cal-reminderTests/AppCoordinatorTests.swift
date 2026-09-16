@@ -226,6 +226,17 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(scheduler.reconcileCalls.last?.triggers.map(\.id), ["evt1#5"])
     }
 
+    func test_wakeCallsOnWake_beforeRePolling() async {
+        let accounts = FakeAccountsManaging()
+        let coordinator = makeCoordinator(accounts: accounts)
+        var onWakeCalled = false
+        coordinator.onWake = { onWakeCalled = true }
+
+        await coordinator.handleWake()
+
+        XCTAssertTrue(onWakeCalled)
+    }
+
     func test_calendarsChangedRebuildsTriggersWithAFullResync() async throws {
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)

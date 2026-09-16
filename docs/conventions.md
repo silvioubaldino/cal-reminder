@@ -3,22 +3,25 @@ id: CONV
 type: conventions
 title: Docs and code conventions
 status: approved
-updated: 2026-07-16
+updated: 2026-09-16
 ---
 
 # Conventions
 
 The "contract" that keeps docs and code consistent and readable by humans and AIs.
-`cal-reminder` is a **single-part** project (one native macOS app), so there is no
-cross-part split — IDs are global and carry **no `@part` suffix**. Two sections:
-**A) documentation** and **B) code**.
+`cal-reminder` is the native macOS app **and** the product's **context repo**: it owns the shared
+layer — requirements, glossary, architecture, cross-repo design (AYD) — that the sibling repo
+`cal-reminder-service` mirrors read-only. Each repo keeps its own SPECs, technical decisions,
+code conventions and changelog. Two sections: **A) documentation** and **B) code**.
 
 ---
 
 ## A. Documentation
 
 ### A.1 Document types, IDs, and where they live
-ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed).
+ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed). The numbering is one
+sequence across the **whole product**: a number is never reused, so a given `SPEC-NNN` exists
+in exactly one repo, never both.
 
 | Prefix | Type | Where |
 |---------|------|------|
@@ -27,12 +30,16 @@ ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed).
 | AYD  | Feature Analysis & Design | `docs/design/` |
 | ARCH | Living architecture (C4) | `docs/architecture.md` |
 | CONV | These conventions | `docs/conventions.md` |
-| SPEC | Specification + plan (what + how) | `docs/specs/` |
-| TDR  | Technical Decision Record | `docs/technical_decisions/` |
+| SPEC | Specification + plan (what + how) | `docs/specs/` — **in the repo it describes** |
+| TDR  | Technical Decision Record | `docs/technical_decisions/` — **in the repo it applies to** |
 
 ### A.2 Referencing
-IDs are **global** across the project. Reference another doc by its plain ID
-(`AYD-003`, `SPEC-012`, `REQ-01`). No `@part` suffix (single-part project).
+IDs are **global** across the product. Reference another doc by its plain ID
+(`AYD-003`, `SPEC-012`, `REQ-01`). A reference that **crosses repos** carries the repo:
+`SPEC-NNN@service` from here, `AYD-NNN@cal-reminder` from there. Within a repo, the plain ID
+is enough. **Before assigning a new ID, check both repos** — the sequence has no central
+allocator, so two branches can pick the same free number; the one that lands on `main` second
+renumbers.
 
 ### A.3 Frontmatter (required in every doc)
 ```yaml
@@ -57,7 +64,9 @@ superseded` for an AYD replaced by a newer one; `proposed → accepted → super
 **approved/accepted** = current source of truth.
 
 ### A.5 Linking (the graph's "glue")
-- Refinement declared on both sides **at creation**: `children` on the parent, `parents` on the child.
+- Refinement declared on both sides **at creation**: `children` on the parent, `parents` on the
+  child. Across repos this is best-effort in one direction — an AYD here lists a SPEC that lives
+  in the service repo, and that SPEC points back with `@cal-reminder`.
 - A SPEC always declares its `AYD` in `parents`; every `AYD` declares its `REQ`. But a **past
   AYD is frozen** (A.6) — a SPEC written after an AYD was approved just points to it in
   `parents`; do **not** retro-edit that AYD's `children`. If the SPEC actually **changes** the
@@ -91,7 +100,17 @@ to `superseded` and set its `superseded_by`, and point new SPECs at the new AYD.
 All docs are written in **English**, including entities, fields, enums, and events
 (these carry through to the code). The glossary defines the canonical term for each concept.
 
-### A.9 Diagrams
+### A.9 Only what was decided
+A doc states the decision, not the road to it. Keep what someone needs to build or use the thing:
+contracts, behavior, acceptance criteria, constraints, and the reason a decision is non-obvious —
+one or two lines, where it prevents the next person undoing it by accident. Cut the rest: the
+history of the discussion, options weighed and dropped, and features the project decided against.
+
+Two exceptions. A **TDR** exists to record a choice, so its `Alternatives & trade-offs` stays —
+one line per alternative. And anything a reader might reasonably expect to find belongs under a
+short **Out of scope** list, so its absence reads as a decision rather than an oversight.
+
+### A.10 Diagrams
 **Mermaid embedded in the `.md`** (version-controlled, renders on GitHub) — never a PNG
 as the canonical source. Current topology → `architecture.md`; a feature's flow → its
 `AYD`. If the diagram diverges from the text, **the text wins**.
@@ -104,6 +123,8 @@ as the canonical source. Current topology → `architecture.md`; a feature's flo
 - **Naming:** use the glossary's terms — always in **English** (variables, functions,
   types, entities). Comments may be in English.
 - **Linter/formatter:** keep configuration and command standardized across the project.
+- The **Project Service** is a separate repo (`cal-reminder-service`) with its own code
+  conventions; these apply to the macOS app.
 
 ### B.2 Tests
 - **Structure:** AAA (Arrange, Act, Assert).
