@@ -110,7 +110,7 @@ sequenceDiagram
     participant G as Grafana
 
     Note over A: launch, wake, animation, or timer tick, first one of a new local day, queues daily_active
-    Note over A: no stored version queues installation as first_install; a different version queues it as update
+    Note over A: no stored version queues installation as first_install, a different version queues it as update
     Note over A: a Reminder animation plays, pending planes_flown increases by one
 
     A->>S: POST /v1/events - appVersion, macosMajor, batch
