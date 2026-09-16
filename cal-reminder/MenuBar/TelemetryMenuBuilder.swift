@@ -12,8 +12,6 @@ private final class TelemetryMenuItemAction: NSObject {
     }
 }
 
-/// A single toggle item, "Report anonymous usage" (RF-17). Absent entirely — not disabled,
-/// absent — when the build carries no Telemetry configuration (Source Build, RNF-13).
 enum TelemetryMenuBuilder {
     static func items(for telemetry: TelemetryReporting?, onToggle: @escaping () -> Void) -> [NSMenuItem] {
         guard let telemetry, telemetry.isConfigured else {

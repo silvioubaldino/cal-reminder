@@ -17,8 +17,6 @@ private final class FakeTelemetryReporting: TelemetryReporting {
 
 final class TelemetryMenuBuilderTests: XCTestCase {
     func test_items_empty_whenNoTelemetry() {
-        // A Source Build never even constructs a TelemetryReporting instance (RNF-13); the
-        // menu must show nothing, not a disabled item.
         XCTAssertTrue(TelemetryMenuBuilder.items(for: nil, onToggle: {}).isEmpty)
     }
 

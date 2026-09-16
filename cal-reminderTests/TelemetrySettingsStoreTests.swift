@@ -9,7 +9,6 @@ final class TelemetrySettingsStoreTests: XCTestCase {
     }
 
     func test_enabled_defaultsToTrue() {
-        // Telemetry is on by default (AYD-013) — a pure opt-in under-reports too badly.
         XCTAssertTrue(makeStore().enabled)
     }
 

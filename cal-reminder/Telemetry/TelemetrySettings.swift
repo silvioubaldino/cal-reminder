@@ -1,9 +1,5 @@
 import Foundation
 
-/// What has accumulated locally since the last accepted batch, and what still needs deciding.
-/// `planesFlown` is a delta (cleared on acceptance); `dailyActiveQueued` and `installationKind`
-/// are one-shot decisions the client makes at most once per day / once per version, independent
-/// of whether the send that carries them has succeeded yet (SPEC-023).
 struct TelemetryPendingBatch: Codable, Equatable {
     var planesFlown: Int = 0
     var dailyActiveQueued: Bool = false
@@ -29,14 +25,9 @@ struct TelemetryPendingBatch: Codable, Equatable {
 }
 
 protocol TelemetrySettingsStoring: AnyObject {
-    /// The menu bar switch (RF-17). Defaults to **on** — a pure opt-in under-reports too
-    /// badly to be useful (AYD-013).
     var enabled: Bool { get set }
-    /// Whether the first-launch notice has been shown; nothing is sent before it has (RF-17).
     var noticeShown: Bool { get set }
-    /// The local calendar day `daily_active` was last decided for — not necessarily sent yet.
     var lastActiveDay: Date? { get set }
-    /// The app version last seen running, to detect a first install or an update.
     var lastSeenVersion: String? { get set }
     var pendingBatch: TelemetryPendingBatch { get set }
 }

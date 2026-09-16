@@ -1,8 +1,5 @@
 import Foundation
 
-/// Accumulates the three counter events AYD-013 defines and sends them as a batch to the
-/// Project Service, at most hourly and only when there is something to send. Constructed only
-/// when `TelemetryConfiguration.make` succeeds — a Source Build never builds one (RNF-13).
 final class TelemetryClient: TelemetryReporting {
     let isConfigured = true
 
@@ -50,8 +47,6 @@ final class TelemetryClient: TelemetryReporting {
         }
     }
 
-    /// Starts the hourly send timer. Called once, after the first-launch notice (if any) has
-    /// been handled — nothing here sends before that.
     func start() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: sendInterval, repeats: true) { [weak self] _ in
@@ -66,8 +61,6 @@ final class TelemetryClient: TelemetryReporting {
         settingsStore.pendingBatch = batch
     }
 
-    /// Idempotent within a local calendar day (AYD-013): the first call on a new day queues
-    /// the event and marks the day; every later call that day is a no-op.
     func recordActiveToday() {
         guard isEnabled else { return }
         let today = calendar.startOfDay(for: clock())
@@ -80,8 +73,6 @@ final class TelemetryClient: TelemetryReporting {
         settingsStore.pendingBatch = batch
     }
 
-    /// `first_install` when no version was ever stored, `update` when the stored one differs
-    /// from the running one, nothing when they match.
     func recordInstallationIfChanged() {
         guard isEnabled else { return }
         let running = appVersion()
@@ -94,14 +85,10 @@ final class TelemetryClient: TelemetryReporting {
     }
 
     private func tick() async {
-        // The timer itself is one of the four places "used today" is decided (AYD-013) — a Mac
-        // left awake for days with no launch, wake or animation still gets counted.
         recordActiveToday()
         await flush()
     }
 
-    /// Sends the pending batch if it is non-empty. The batch is cleared only on a `202` — a
-    /// failed or offline send leaves it untouched so the next tick retries it whole (SPEC-023).
     func flush() async {
         guard isEnabled else { return }
         let batch = settingsStore.pendingBatch

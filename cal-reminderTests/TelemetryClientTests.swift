@@ -44,7 +44,6 @@ private func httpResponse(status: Int, url: URL) -> HTTPURLResponse {
     HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
 }
 
-/// Decodes what the client actually sent, for assertions.
 private struct DecodedBatch: Decodable {
     let appVersion: String
     let macosMajor: String
@@ -102,12 +101,6 @@ final class TelemetryClientTests: XCTestCase {
     func test_make_nil_whenEndpointIsNotAValidURL() {
         XCTAssertNil(TelemetryConfiguration.make(endpoint: "not a url", key: "abc123"))
     }
-
-    // Structural guarantee, not something a TelemetryClient instance can assert: AppDelegate
-    // only builds one inside `if let telemetryConfiguration { ... }`, so a nil configuration
-    // means no client, no timer, and no request ever happens — there is nothing to construct
-    // and flush against (RNF-13, AYD-013). `make` returning nil, asserted above, is what drives
-    // that branch to never run.
 
     // MARK: recordPlaneFlown / flush
 
@@ -183,13 +176,13 @@ final class TelemetryClientTests: XCTestCase {
         let store = FakeTelemetrySettingsStore()
         let client = makeClient(httpClient: http, settingsStore: store)
         client.recordActiveToday()
-        await client.flush() // accepted, batch cleared
+        await client.flush()
 
-        // Act — represents a relaunch, or the hourly timer ticking again, later the same day
+        // Act
         client.recordActiveToday()
         await client.flush()
 
-        // Assert — only the first flush produced a request
+        // Assert
         let sent = await http.sentRequests
         XCTAssertEqual(sent.count, 1)
     }
@@ -203,7 +196,7 @@ final class TelemetryClientTests: XCTestCase {
         client1.recordActiveToday()
         await client1.flush()
 
-        // Act — a new calendar day
+        // Act
         let day2 = day1.addingTimeInterval(36 * 60 * 60)
         let client2 = TelemetryClient(configuration: config, httpClient: http, settingsStore: store, clock: { day2 }, appVersion: { "1.4.2" }, macosMajor: { "15" })
         client2.recordActiveToday()
@@ -215,8 +208,7 @@ final class TelemetryClientTests: XCTestCase {
     }
 
     func test_recordActiveToday_survivesRestart_sameDayIsStillANoOp() async {
-        // Arrange — a fresh TelemetryClient instance sharing the same underlying store,
-        // representing the app being quit and relaunched the same day.
+        // Arrange
         let http = StubHTTPClient()
         let store = FakeTelemetrySettingsStore()
         let client1 = makeClient(httpClient: http, settingsStore: store)
@@ -227,13 +219,12 @@ final class TelemetryClientTests: XCTestCase {
         let client2 = makeClient(httpClient: http, settingsStore: store)
         client2.recordActiveToday()
 
-        // Assert — nothing new was queued by the relaunch
+        // Assert
         XCTAssertTrue(store.pendingBatch.isEmpty)
     }
 
     func test_animationAndDailyActive_recordedTogether_flushInOneBatch() async {
-        // Arrange — how AppDelegate's Scheduler.onFire closure calls the client for a real
-        // (non-test) animation.
+        // Arrange
         let http = StubHTTPClient()
         let client = makeClient(httpClient: http)
 
@@ -308,16 +299,16 @@ final class TelemetryClientTests: XCTestCase {
         let client = makeClient(httpClient: http, settingsStore: store)
         client.recordPlaneFlown()
         client.recordPlaneFlown()
-        await client.flush() // fails
+        await client.flush()
 
         // Act
         await http.setMode(.accepted)
         client.recordPlaneFlown()
-        await client.flush() // succeeds, carrying the combined count
+        await client.flush()
 
         // Assert
         let sent = await http.sentRequests
-        XCTAssertEqual(sent.count, 2, "one failed attempt, one that succeeded")
+        XCTAssertEqual(sent.count, 2)
         XCTAssertEqual(try! decode(sent[1]).events, [TelemetryEvent(name: "planes_flown", value: 3)])
     }
 
@@ -331,7 +322,7 @@ final class TelemetryClientTests: XCTestCase {
         // Act
         await client.flush()
 
-        // Assert — a non-202 status leaves the batch pending, same as a network failure
+        // Assert
         XCTAssertFalse(store.pendingBatch.isEmpty)
     }
 

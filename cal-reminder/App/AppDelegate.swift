@@ -17,8 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let updateController = UpdateController(configuration: updateConfiguration)
 
-        // The first-launch notice runs synchronously, before the client's timer is ever
-        // started, so nothing can be sent before the user has seen it (RF-17).
         let telemetryConfiguration = TelemetryConfiguration.make(
             endpoint: Bundle.main.object(forInfoDictionaryKey: "TelemetryEndpoint") as? String,
             key: Bundle.main.object(forInfoDictionaryKey: "TelemetryKey") as? String
@@ -35,9 +33,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let accountRegistry = Self.makeAccountRegistry(reminderSettingsStore: reminderSettingsStore)
         let scheduler = Scheduler(onFire: { [telemetryClient] trigger in
-            // Only a Trigger that actually fired reaches here — the test animation is enqueued
-            // directly by AppCoordinator.testAnimation() and never goes through the Scheduler,
-            // so it never counts (SPEC-023).
             telemetryClient?.recordPlaneFlown()
             telemetryClient?.recordActiveToday()
             Task { await overlayPresenter.enqueue(trigger) }

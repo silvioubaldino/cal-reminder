@@ -5,9 +5,6 @@ enum TelemetryNoticeChoice {
     case turnOff
 }
 
-/// Shown once, before the first batch ever leaves the Mac (RF-17). Blocking by design — it
-/// runs synchronously during launch, before `TelemetryClient.start()` schedules anything, so
-/// there is no window in which telemetry could be sent before the user has seen this.
 enum TelemetryFirstLaunchNotice {
     static func presentIfNeeded(
         settingsStore: TelemetrySettingsStoring,

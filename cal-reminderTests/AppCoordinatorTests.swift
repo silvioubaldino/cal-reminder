@@ -227,8 +227,6 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     func test_wakeCallsOnWake_beforeRePolling() async {
-        // AYD-013: the app's own "used today" liveness signal is decided on wake, since a Mac
-        // that slept overnight and wakes with the app still running never relaunches.
         let accounts = FakeAccountsManaging()
         let coordinator = makeCoordinator(accounts: accounts)
         var onWakeCalled = false
