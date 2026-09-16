@@ -67,7 +67,7 @@ flowchart TB
 | **cal-reminder** | The whole app; a background menu bar agent that syncs Events and draws the airplane Overlay | Swift 5.9+ · AppKit (`NSStatusItem`, `NSPanel`) · Core Animation · `URLSession`/`Codable` · Keychain Services · Xcode (`LSUIElement` bundle) |
 | **Google Calendar API** | Source of Events and Reminders (read-only) | Google Calendar REST v3 · OAuth 2.0 (Desktop/PKCE) |
 | **macOS Keychain** | Secure storage of the OAuth refresh token | Keychain Services |
-| **Project Service** | Receives Telemetry from Distributed Builds and publishes the counters; stateless, no database | Go · Cloud Run · OpenTelemetry SDK · Cloud Monitoring · Grafana Cloud (datasource) |
+| **Project Service** *(repo `cal-reminder-service`)* | Receives Telemetry from Distributed Builds and publishes the counters; stateless, no database | Go · Cloud Run · OpenTelemetry SDK · Cloud Monitoring · Grafana Cloud (datasource) |
 | **Release host** | Serves the signed Appcast and the notarized `.dmg` the app updates itself from; also hosts the landing page and privacy policy | Static HTTPS hosting · GitHub Releases · Sparkle Appcast (EdDSA-signed) |
 
 ## Components (inside cal-reminder)

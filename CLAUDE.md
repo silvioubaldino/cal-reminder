@@ -6,8 +6,9 @@ be **distributed directly** — signed, notarized, downloaded as a `.dmg` or ins
 Homebrew, and self-updating (RF-16) — and **sold on trust**: the source is public and anyone
 can build it for free with their own Google credentials, while a purchase buys the ready-to-run,
 auto-updating build (RNF-12). Not an App Store app (AYD-009). It is a commercial product, held
-to a distributable bar on security and privacy. Two code roots — the macOS app (`cal-reminder/`)
-and the Project Service (`service/`, AYD-012) — under one documentation trunk. Documentation is
+to a distributable bar on security and privacy. This repo is both the **macOS client** and the
+product's **context repo**: it holds the shared layer (requirements, glossary, architecture,
+cross-repo design) that the sibling repo `cal-reminder-service` mirrors. Documentation is
 **spec-driven** and lean.
 
 ## Start here
@@ -43,7 +44,8 @@ and the Project Service (`service/`, AYD-012) — under one documentation trunk.
 - A feature's design lives in the **AYD**; the SPEC implements, it doesn't redefine.
 - **AYDs are append-only**: never rewrite a past AYD — supersede/override it with a new one
   (`supersedes` / `superseded_by`). Only its `status`/`superseded_by` may change (like a TDR).
-- References use the plain ID (`SPEC-012`, `AYD-003`) — no `@part` suffix, in either code root.
+- References use the plain ID (`SPEC-012`, `AYD-003`). A reference that crosses into the
+  service repo carries it: `SPEC-022@service`. IDs are one global sequence across both repos.
 - All docs are written in **English**.
 - Changed a **living** doc (REQ/GLO/ARCH/CONV)? Update `updated` and mark affected `children`
   as `status: review`. (AYDs aren't living — supersede them instead, see above.)

@@ -9,20 +9,19 @@ updated: 2026-09-16
 # Conventions
 
 The "contract" that keeps docs and code consistent and readable by humans and AIs.
-`cal-reminder` has **two code roots** — the native macOS app (`cal-reminder/`) and the Project
-Service (`service/`, AYD-012) — but a **single documentation trunk**: one set of requirements,
-one glossary, one architecture, and IDs that are global across both. There is still **no
-`@part` suffix** on any ID; a doc says which root it touches in its own text. Two sections:
-**A) documentation** and **B) code**.
+`cal-reminder` is the native macOS app **and** the product's **context repo**: it owns the shared
+layer — requirements, glossary, architecture, cross-repo design (AYD) — that the sibling repo
+`cal-reminder-service` mirrors read-only. Each repo keeps its own SPECs, technical decisions,
+code conventions and changelog. Two sections: **A) documentation** and **B) code**.
 
 ---
 
 ## A. Documentation
 
 ### A.1 Document types, IDs, and where they live
-ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed). The numbering is
-shared by both code roots — a SPEC for the Project Service and a SPEC for the app draw from the
-same sequence.
+ID = `PREFIX-NNN`, **stable** (never changes, even if the file is renamed). The numbering is one
+sequence across the **whole product**: a number is never reused, so `SPEC-022` exists in the
+service repo and nowhere else.
 
 | Prefix | Type | Where |
 |---------|------|------|
@@ -31,12 +30,14 @@ same sequence.
 | AYD  | Feature Analysis & Design | `docs/design/` |
 | ARCH | Living architecture (C4) | `docs/architecture.md` |
 | CONV | These conventions | `docs/conventions.md` |
-| SPEC | Specification + plan (what + how) | `docs/specs/` |
-| TDR  | Technical Decision Record | `docs/technical_decisions/` |
+| SPEC | Specification + plan (what + how) | `docs/specs/` — **in the repo it describes** |
+| TDR  | Technical Decision Record | `docs/technical_decisions/` — **in the repo it applies to** |
 
 ### A.2 Referencing
-IDs are **global** across the project. Reference another doc by its plain ID
-(`AYD-003`, `SPEC-012`, `REQ-01`). No `@part` suffix, in either code root.
+IDs are **global** across the product. Reference another doc by its plain ID
+(`AYD-003`, `SPEC-012`, `REQ-01`). A reference that **crosses repos** carries the repo:
+`SPEC-022@service` from here, `AYD-012@cal-reminder` from there. Within a repo, the plain ID
+is enough.
 
 ### A.3 Frontmatter (required in every doc)
 ```yaml
@@ -61,7 +62,9 @@ superseded` for an AYD replaced by a newer one; `proposed → accepted → super
 **approved/accepted** = current source of truth.
 
 ### A.5 Linking (the graph's "glue")
-- Refinement declared on both sides **at creation**: `children` on the parent, `parents` on the child.
+- Refinement declared on both sides **at creation**: `children` on the parent, `parents` on the
+  child. Across repos this is best-effort in one direction — an AYD here lists a SPEC that lives
+  in the service repo, and that SPEC points back with `@cal-reminder`.
 - A SPEC always declares its `AYD` in `parents`; every `AYD` declares its `REQ`. But a **past
   AYD is frozen** (A.6) — a SPEC written after an AYD was approved just points to it in
   `parents`; do **not** retro-edit that AYD's `children`. If the SPEC actually **changes** the
@@ -116,10 +119,10 @@ as the canonical source. Current topology → `architecture.md`; a feature's flo
 
 ### B.1 Style
 - **Naming:** use the glossary's terms — always in **English** (variables, functions,
-  types, entities), in Swift and in Go alike. Comments may be in English.
-- **Roots:** `cal-reminder/` is the macOS app (Swift); `service/` is the Project Service (Go).
-  Each root keeps its own linter, formatter and test command; CI runs both.
+  types, entities). Comments may be in English.
 - **Linter/formatter:** keep configuration and command standardized across the project.
+- The **Project Service** is a separate repo (`cal-reminder-service`) with its own code
+  conventions; these apply to the macOS app.
 
 ### B.2 Tests
 - **Structure:** AAA (Arrange, Act, Assert).

@@ -4,15 +4,15 @@ type: spec
 status: draft
 updated: 2026-09-16
 parents: [AYD-012]
-related: [SPEC-022, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
+related: [SPEC-022@service, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
 ---
 
 # SPEC-023: Telemetry client in the app — what + how
 
 > Implements the app half of AYD-012: three counter events, the once-a-day rule, the menu bar
 > switch, and the configuration gate that keeps a **Source Build** silent. Depends on
-> **SPEC-022** for the endpoint and on **SPEC-018** for the untracked config the endpoint and key
-> land in.
+> `SPEC-022@service` for the endpoint and on **SPEC-018** for the untracked config the endpoint
+> and key land in.
 
 ## What (goal)
 1. Three events, accumulated locally and sent as one batch, at most hourly:

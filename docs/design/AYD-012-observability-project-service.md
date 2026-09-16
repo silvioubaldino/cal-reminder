@@ -4,8 +4,8 @@ type: design
 status: draft
 updated: 2026-09-16
 parents: [RF-17, RNF-13, RNF-12]
-children: [SPEC-022, SPEC-023]
-related: [GLO, AYD-009, TDR-007, TDR-008]
+children: [SPEC-022@service, SPEC-023]
+related: [GLO, AYD-009, TDR-007, TDR-008@service]
 supersedes: []
 superseded_by: null
 ---
@@ -28,8 +28,8 @@ scheduled job, no aggregation. A handler validates a batch, increments counters,
 ## Affected modules
 | Module | Role in this feature | Generated SPEC |
 |--------|----------------------|----------------|
-| **Project Service** *(new, `service/`)* | Go service on Cloud Run: `POST /v1/events`; owns the metric allowlist and the OTel export | SPEC-022 |
-| **Cloud Monitoring** *(new integration)* | Where every metric lands; Grafana reads it as a datasource | SPEC-022 |
+| **Project Service** *(new repo, `cal-reminder-service`)* | Go service on Cloud Run: `POST /v1/events`; owns the metric allowlist and the OTel export | SPEC-022@service |
+| **Cloud Monitoring** *(new integration)* | Where every metric lands; Grafana reads it as a datasource | SPEC-022@service |
 | **TelemetryClient** *(new, app)* | Accumulates pending events, enforces the once-a-day rule, sends the batch, honours the switch and the configuration gate | SPEC-023 |
 | **AppDelegate / AppCoordinator** | Builds the client from configuration, or does not; reports the installation on launch and the new day on launch and on wake | SPEC-023 |
 | **OverlayPresenter** | Reports each Reminder animation played, and the new day with it | SPEC-023 |
@@ -154,9 +154,10 @@ sequenceDiagram
   decided from it.
 - **`--max-instances` is part of the design**, not an ops detail: it is what turns a flood into a
   503 instead of an invoice.
-- **No Collector sidecar; the SDK exports straight to Cloud Monitoring** — TDR-008.
-- **The service lives in `service/`, in this repository, public.** It makes the project multi-part;
-  `conventions.md` §A.1 is updated in the same change.
+- **No Collector sidecar; the SDK exports straight to Cloud Monitoring** — `TDR-008@service`.
+- **The service lives in its own public repository, `cal-reminder-service`.** This one becomes the
+  product's context repo: the service mirrors its shared layer read-only and owns its own SPEC and
+  technical decisions. Nothing secret is in the service beyond environment variables.
 
 ## Out of scope
 - **Crash reporting (RF-18).** A crash is a document, not a count; it needs symbolication,
