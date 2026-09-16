@@ -3,8 +3,8 @@ id: AYD-012
 type: design
 status: draft
 updated: 2026-09-16
-parents: [RF-17, RF-18, RNF-13, RNF-12]
-children: [SPEC-022, SPEC-023, SPEC-024]
+parents: [RF-17, RNF-13, RNF-12]
+children: [SPEC-022, SPEC-023]
 related: [GLO, AYD-009, AYD-010, TDR-007, TDR-008]
 supersedes: []
 superseded_by: null
@@ -13,27 +13,30 @@ superseded_by: null
 # AYD-012: Observability and the Project Service
 
 > Analysis & Design of the first project-owned backend: what a **Distributed Build** reports,
-> what receives it, and how the project turns that into numbers it can look at (RF-17, RF-18,
-> RNF-13). It **does not supersede AYD-009** — AYD-009 listed telemetry as a non-goal because
+> what receives it, and how the project turns that into numbers it can look at (RF-17, RNF-13). It **does not supersede AYD-009** — AYD-009 listed telemetry as a non-goal because
 > RNF-12 forbade it at the time; RNF-12 has since been rewritten, and AYD-009's distribution
 > design is untouched here. Source of the design — the SPECs implement it.
 
 ## Goal
 Today the project ships an app and then goes blind. Nobody knows whether anyone opens it, on
-which version, whether the airplane ever flies, or that it crashed. This design answers exactly
+which version, or whether the airplane ever flies. This design answers exactly
 three questions, and deliberately no more:
 
 1. **How many airplanes flew?** — is the app doing its job, and how often.
-2. **How many Installs were used today, on which version?** — is anyone there, and did a release
-   get adopted.
-3. **How many updates were installed?** — optional, and the same signal seen from the other side.
-
-Plus crash reports (RF-18), which are not a metric.
+2. **How many Installs were used on a given day, on which version?** — is anyone there.
+3. **How many installations happened, and were they new or an update?** — did a release get
+   adopted, and is the base growing.
 
 Non-goals, all of them chosen rather than deferred: counting distinct Installs with any
 consistency; 7- and 30-day actives; retention and cohorts; total Installs ever; fleet totals of
 Accounts and Calendars; subscriptions and entitlements; the landing page; download and Homebrew
 counts (GitHub and Homebrew publish those for free); per-event streams.
+
+**Crash reporting (RF-18) is out of this design.** A crash count is a fair metric, but the crash
+itself is a document, not a number, and there is no cheap version of it: counting a crash already
+requires the scanner that finds it. It also carries questions this AYD has no business answering —
+symbolication against a release's dSYM, grouping identical crashes, how anyone actually reads them,
+retention. It gets its own AYD.
 
 ## Analysis
 
@@ -80,20 +83,39 @@ the whole fleet at once. The consequence is the shape of the whole service: **no
 scheduled job, no rollup, no aggregation.** A handler validates a batch, increments counters, and
 answers.
 
-### The daily dedupe moves to the client
+### The daily dedupe moves to the client, and what counts as "used"
 
 "Used today" is only a count of Installs if each Install reports it once. That is enforced in the
-app: it keeps the last **local calendar day** on which it sent the event, and sends it the first
-time it does anything on a new day — a launch, or the first Reminder animation, whichever comes
-first. A second launch the same day adds nothing.
+app: it keeps the last **local calendar day** on which it sent the event and queues the event the
+first time it notices a new day. A second notice the same day adds nothing.
 
 Calendar-day, not "24 hours elapsed": elapsed time drifts and can produce two events in one day or
 none in another, while a date comparison dedupes exactly. Installs in different time zones smear
 the boundary by a few hours, which does not matter at the resolution anyone reads this number.
 
-What the number therefore is, stated honestly so nobody over-reads it: **Installs that opened or
-fired at least one Reminder on a given day, among those that have Telemetry switched on.** It is
-not unique users, and it is a lower bound.
+**Where the check runs is what decides whether the number is right.** Launch alone is not enough:
+this is a menu bar agent that starts at login and then stays up for days, so the most common way a
+Mac "comes back" is waking from sleep, with no launch at all. Four call sites:
+
+| Trigger | Covers |
+|---|---|
+| Launch | a Mac powered on, or the app started by hand |
+| **Wake from sleep** | a Mac that slept overnight and woke with the app still running |
+| A Reminder animation played | an Install that was already up and did its job |
+| The hourly send timer | a Mac left awake for days with no animation |
+
+The timer is the guarantee — worst case the event is an hour late. Launch and wake exist so it is
+prompt. `AppCoordinator.handleWake()` already exists for AYD-011, so wake is one more call site.
+
+What the number therefore is, stated plainly so nobody over-reads it: **Installs whose app was
+running on an awake Mac at some point that day, among those with Telemetry switched on.** For a
+menu bar agent that launches at login, "opened the app" is not an action a user really performs, so
+this is the useful reading rather than a compromise. It is not unique users, and it is a lower
+bound.
+
+It is also only meaningful **bucketed by day**. Summing the counter over a seven-day window gives
+Install-days, not distinct Installs — the same Mac appears seven times. The dashboard shows one bar
+per day and says so.
 
 ### One endpoint, an allowlist of names
 
@@ -138,14 +160,13 @@ appears — **TDR-008**.
 ## Affected modules
 | Module | Role in this feature | Generated SPEC |
 |--------|----------------------|----------------|
-| **Project Service** *(new, `service/`)* | Go service on Cloud Run: `/v1/events` and `/v1/crash`; owns the metric allowlist and the OTel export | SPEC-022 |
+| **Project Service** *(new, `service/`)* | Go service on Cloud Run: `/v1/events`; owns the metric allowlist and the OTel export | SPEC-022 |
 | **Cloud Monitoring** *(new integration)* | Where every metric lands; Grafana reads it | SPEC-022 |
 | **TelemetryClient** *(new, app)* | Accumulates pending events, enforces the once-a-day rule, sends the batch, honours the switch and the gate | SPEC-023 |
-| **OverlayPresenter** | Reports each Reminder animation played | SPEC-023 |
-| **UpdateController / AppDelegate** | Reports that the running version changed since the last launch | SPEC-023 |
+| **OverlayPresenter** | Reports each Reminder animation played, and the new day with it | SPEC-023 |
+| **AppDelegate** | Reports the installation on launch — first install or update — and the new day on launch and on wake | SPEC-023 |
 | **AppCoordinator** | Builds the TelemetryClient from configuration, or does not | SPEC-023 |
 | **MenuBar UI** | States that Telemetry is on and offers the switch; carries the first-launch notice | SPEC-023 |
-| **CrashReporter** *(new, app)* | Finds the macOS crash report for its own process, asks, sends | SPEC-024 |
 
 New integrations: the Project Service, Cloud Monitoring and Grafana Cloud. No database, no
 scheduler. `architecture.md` gains them in the same change.
@@ -157,22 +178,17 @@ scheduler. `architecture.md` gains them in the same change.
 { "appVersion": "1.4.2",
   "macosMajor": "15",
   "events": [ { "name": "planes_flown",     "value": 3 },
-              { "name": "daily_active",     "value": 1 },
-              { "name": "update_installed", "value": 1 } ] }
+              { "name": "daily_active", "value": 1 },
+              { "name": "installation", "value": 1, "kind": "update" } ] }
 → 202 Accepted   (no body)
 ```
 
 **Allowlist** — a name outside it is dropped, the rest of the batch still counts
 ```
-planes_flown      counter · label app_version              · value 1..1000
-daily_active      counter · labels app_version, macos_major · value == 1
-update_installed  counter · label app_version              · value == 1
-```
-
-**`POST /v1/crash`** — only after the user agrees, one report per request
-```
-{ "appVersion": "1.4.2", "macosMajor": "15", "report": "<contents of the .ips file>" }
-→ 202 Accepted
+planes_flown   counter · label app_version               · value 1..1000
+daily_active   counter · labels app_version, macos_major  · value == 1
+installation   counter · labels app_version, kind         · value == 1
+                         kind ∈ { first_install, update }
 ```
 
 Every request carries `X-Telemetry-Key: <build-time key>`; without it, 401 and nothing recorded.
@@ -182,9 +198,8 @@ Every request carries `X-Telemetry-Key: <build-time key>`; without it, 401 and n
 | Metric | Kind | Labels | Answers |
 |---|---|---|---|
 | `planes_flown_total` | counter | `app_version` | Airplanes per hour / per day |
-| `daily_active_total` | counter | `app_version`, `macos_major` | Installs used that day, and on which version |
-| `update_installed_total` | counter | `app_version` | Installs that arrived at a version |
-| `crash_reports_total` | counter | `app_version` | Crashes, and where |
+| `daily_active_total` | counter | `app_version`, `macos_major` | Installs used that day, and on which version — read one bar per day |
+| `installations_total` | counter | `app_version`, `kind` | Installations that ran at least once, split into first install and update |
 
 **App-side configuration gate** — mirrors `UpdateConfiguration`
 ```
@@ -198,8 +213,9 @@ protocol TelemetryReporting: AnyObject {
     var isConfigured: Bool { get }     // false in a Source Build
     var isEnabled: Bool { get set }    // the menu bar switch (RF-17)
     func recordPlaneFlown()
-    func recordActiveToday()           // no-op when already sent for the current local day
-    func recordUpdateInstalled(to version: String)
+    func recordActiveToday()           // no-op when already sent for the current local day;
+                                       // called on launch, on wake, on each animation, and on each timer tick
+    func recordInstallationIfChanged() // first_install when no version was stored, update when it differs
 }
 ```
 
@@ -222,8 +238,8 @@ sequenceDiagram
     participant M as Cloud Monitoring
     participant G as Grafana
 
-    Note over A: launch - first action of a new local day -> queue daily_active
-    Note over A: version changed since last launch -> queue update_installed
+    Note over A: launch, wake, animation or timer tick - first one of a new local day -> queue daily_active
+    Note over A: no stored version -> queue installation first_install; different version -> update
     Note over A: a Reminder animation plays -> pending planes_flown ++
 
     A->>S: POST /v1/events - appVersion, macosMajor, batch
@@ -241,8 +257,11 @@ sequenceDiagram
   fleet at once was cut in §Analysis.
 - **No identifier, anywhere.** Nothing to deduplicate server-side means nothing to store, and the
   privacy policy gets to say the reports contain no identifier at all.
-- **"Used today" is deduped on the client, by local calendar day.** A date comparison dedupes
-  exactly; an elapsed-time rule drifts.
+- **"Used today" is deduped on the client, by local calendar day**, and checked on launch, on
+  wake, on each animation and on each timer tick. A date comparison dedupes exactly; an
+  elapsed-time rule drifts. Wake matters most: a menu bar agent rarely relaunches.
+- **`daily_active_total` is read bucketed by day.** Summed over a longer window it is Install-days,
+  not distinct Installs.
 - **The pending batch is cleared only after a `202`.** An offline or sleeping Mac accumulates and
   reports late; an animation is never lost, only delayed.
 - **Metric names come from a server-side allowlist.** A client that could invent a name could
@@ -258,10 +277,10 @@ sequenceDiagram
 - **Out — retention, cohorts, 7/30-day actives, total Installs ever.** Cut deliberately; see
   §Analysis. They come back with subscriptions, which bring an identity of their own.
 - **Out — Accounts and Calendars per Install.** Interesting once, not worth a field.
+- **Out — crash reporting (RF-18).** Its own AYD; see §Goal.
 - **Out — subscriptions, entitlements, feature locks, per-Install authentication.**
-- **Out — logs and traces.** Metrics and crash reports only.
+- **Out — logs and traces.** Counters only.
 - **Known — every count is a lower bound.** Anyone who switches Telemetry off is invisible, and
   there is no honest way to correct for it. The dashboard should say so rather than pretend.
 - **Known — `daily_active_total` is not unique users.** One person with two Macs counts twice; one
   Mac used by two people counts once. Stated on the dashboard.
-- **Open — how long crash reports are kept.** Set in SPEC-024, but it is a privacy-policy fact.

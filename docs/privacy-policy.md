@@ -38,8 +38,9 @@ The version of the app downloaded from our site sends us a small number of count
 whether the app is working and whether a new version reached people. It sends three things:
 
 - **How many times the Reminder animation played.**
-- **One "used today" signal per day**, the first time you open the app or it shows you a Reminder.
-- **One signal when an update has been installed.**
+- **One "used today" signal per day**, the first time the app notices a new day while it is
+  running — when you start your Mac, when it wakes, or when it shows you a Reminder.
+- **One signal when the app is installed**, saying whether it was a first install or an update.
 
 Each of these carries the version of the app and of macOS you are running, and nothing else.
 
@@ -52,14 +53,9 @@ today, 380 of them on version 1.4.2". You can switch it off from the menu bar at
 These reports never contain your calendar events, your calendar names, your email address, or
 anything you typed.
 
-**Crash reports** are separate and always ask first. If the app crashes, macOS writes a technical
-report about it. On the next launch we show you that report and ask whether to send it. Nothing is
-sent unless you say yes, we ask again for each new crash rather than remembering an answer, the
-report carries no identifier either, and what we receive is kept for 90 days and then deleted.
-
 **If you build the app yourself** from our public source code, none of this happens: with no
-configuration of ours in the build, the app contacts no server of ours at all — no usage counts,
-no crash reports, and no update checks.
+configuration of ours in the build, the app contacts no server of ours at all — no usage counts
+and no update checks.
 
 ## What is stored, and where
 
@@ -78,7 +74,7 @@ no crash reports, and no update checks.
   revokes local access to the stored token.
 - You can choose which Calendars generate Reminders, or turn the app off entirely, from the
   menu bar.
-- You can switch off the usage counts from the menu bar, and you can decline any crash report.
+- You can switch off the usage counts from the menu bar at any time.
 
 ## Contact
 

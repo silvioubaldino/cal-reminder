@@ -17,16 +17,17 @@ related: [SPEC-022, SPEC-018, RF-17, RNF-13, RNF-12, GLO, REQ-01]
 ## What (goal)
 1. Three events, accumulated locally and sent as one batch, at most hourly:
    - `planes_flown` — Reminder animations played since the last accepted batch.
-   - `daily_active` — once per local calendar day, on the first launch or first animation of
-     that day.
-   - `update_installed` — once, when the running version differs from the last one seen.
+   - `daily_active` — once per local calendar day, queued by whichever comes first: a launch, a
+     wake from sleep, a Reminder animation, or an hourly timer tick.
+   - `installation` — once per installation, `kind: first_install` when no version was ever
+     stored, `kind: update` when the stored one differs from the running one.
 2. A menu bar item that says Telemetry is on and switches it off, plus a first-launch notice shown
    before the first batch leaves the Mac.
 3. **No identifier of any kind** is generated, stored or sent.
 4. With no `TELEMETRY_ENDPOINT` or no `TELEMETRY_KEY` in the build, no request is ever made —
    proven by a test, because it is what RNF-13 promises about a Source Build.
 
-Out of scope: crash reports (SPEC-024).
+Out of scope: crash reporting — AYD-012 takes it out of scope entirely.
 
 ## Acceptance criteria
 ```gherkin
@@ -50,7 +51,21 @@ Scenario: Used-today is reported once per calendar day
   Given the app launches on a day it has not yet reported
   Then daily_active 1 is queued
   And a second launch on the same day queues nothing
-  And the first animation on a day with no launch-side report still queues it
+
+Scenario: A Mac that wakes without relaunching still counts
+  Given the app has been running since yesterday and never relaunched
+  And the Mac slept overnight and wakes today
+  Then daily_active 1 is queued on wake
+
+Scenario: A Mac left awake for days still counts each day
+  Given the app has been running with no launch, no wake and no animation
+  When the hourly timer ticks on a new calendar day
+  Then daily_active 1 is queued
+
+Scenario: An animation also counts the day
+  Given no launch, wake or tick has reported today yet
+  When a Reminder animation plays
+  Then daily_active 1 is queued
 
 Scenario: Used-today survives a restart
   Given daily_active was already sent today
@@ -62,10 +77,16 @@ Scenario: A new day reports again
   When the app is used today
   Then daily_active 1 is queued once
 
-Scenario: An installed update is reported once
+Scenario: A first install is reported once
+  Given no version has ever been stored
+  When the app launches
+  Then installation 1 is queued with kind first_install
+  And the next launch queues nothing
+
+Scenario: An update is reported once
   Given the last version seen was 1.4.1 and the running version is 1.4.2
   When the app launches
-  Then update_installed 1 is queued with appVersion 1.4.2
+  Then installation 1 is queued with kind update and appVersion 1.4.2
   And the next launch on the same version queues nothing
 
 Scenario: A failed send never loses an event
@@ -98,9 +119,13 @@ Scenario: The test animation does not count
   know what a Source Build is.
 - **The pending batch is persisted** in `UserDefaults` so a quit or a crash does not lose it, and
   is cleared only after a `202`.
-- **The daily rule is a stored date**, compared against today in the current local calendar —
-  not an elapsed-time check, which drifts.
-- **The update rule is a stored version string**, compared against the running one on launch.
+- **The daily rule is a stored date**, compared against today in the current local calendar — not
+  an elapsed-time check, which drifts. It is checked from four places (launch, wake, animation,
+  timer tick) and is idempotent, so extra call sites are free: the timer is the guarantee, launch
+  and wake make it prompt. Wake is the one that matters — a menu bar agent that starts at login
+  rarely relaunches.
+- **The installation rule is a stored version string**: absent means `first_install`, different
+  means `update`, equal means nothing.
 - **One timer**, hourly, that sends only when the batch is non-empty; a failure just waits for the
   next tick, with no retry storm.
 - **Settings follow `UpdateSettings.swift`**: a `TelemetrySettingsStoring` protocol with a
@@ -111,9 +136,10 @@ Scenario: The test animation does not count
    and `project.yml` alongside `SUFeedURL` (SPEC-018).
 2. `TelemetrySettings`: the on/off flag, the "notice shown" flag, the last reported day, the last
    seen version, and the pending batch.
-3. `TelemetryClient`: queue, hourly timer, batch request with `X-Telemetry-Key`, short timeout.
-4. Wire it in `AppCoordinator`; report `recordActiveToday()` on launch and
-   `recordUpdateInstalled(to:)` when the version changed.
+3. `TelemetryClient`: queue, hourly timer (which also runs the day check), batch request with
+   `X-Telemetry-Key`, short timeout.
+4. Wire it in `AppCoordinator`: `recordActiveToday()` on launch and inside `handleWake()`, and
+   `recordInstallationIfChanged()` on launch.
 5. `OverlayPresenter` calls `recordPlaneFlown()` and `recordActiveToday()` on a real animation.
 6. Menu bar: the Telemetry item and the switch; the first-launch notice.
 7. README: what is reported, what is not, that it carries no identifier, and how to turn it off.
@@ -129,9 +155,10 @@ Scenario: The test animation does not count
 
 ## Tests
 - **Acceptance:** one test per Gherkin scenario, with the HTTP boundary and the clock faked.
-- **Unit:** the daily rule across a day boundary and across a restart; the update rule; the
-  pending batch across failure, success and relaunch; `TelemetryConfiguration.make` with each
-  field missing.
+- **Unit:** the daily rule across a day boundary, across a restart and across each of the four
+  call sites (idempotent within a day); the installation rule for absent, different and equal
+  stored versions; the pending batch across failure, success and relaunch;
+  `TelemetryConfiguration.make` with each field missing.
 - **The Source Build test is the important one:** with a `nil` configuration, assert the fake HTTP
   client recorded **zero** requests over a full simulated day, including launch. RNF-13 names it.
 
@@ -139,4 +166,5 @@ Scenario: The test animation does not count
 - [ ] No identifier is generated, stored or sent anywhere
 - [ ] No Event title, Calendar name or Account email can reach a payload
 - [ ] The test animation does not count
+- [ ] Waking from sleep reports the new day without a relaunch
 - [ ] `nil` configuration means zero requests, asserted by a test
