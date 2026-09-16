@@ -109,15 +109,15 @@ sequenceDiagram
     participant M as Cloud Monitoring
     participant G as Grafana
 
-    Note over A: launch, wake, animation or timer tick - first one of a new local day -> queue daily_active
-    Note over A: no stored version -> queue installation first_install; different version -> update
-    Note over A: a Reminder animation plays -> pending planes_flown ++
+    Note over A: launch, wake, animation, or timer tick, first one of a new local day, queues daily_active
+    Note over A: no stored version queues installation as first_install; a different version queues it as update
+    Note over A: a Reminder animation plays, pending planes_flown increases by one
 
     A->>S: POST /v1/events - appVersion, macosMajor, batch
     S->>S: drop names outside the allowlist, validate ranges
     S->>M: increment each counter
     S-->>A: 202
-    Note over A: the pending batch is cleared only after the 202
+    Note over A: the pending batch is cleared only after the 202 is received
 
     G->>M: reads Cloud Monitoring as a datasource
 ```
