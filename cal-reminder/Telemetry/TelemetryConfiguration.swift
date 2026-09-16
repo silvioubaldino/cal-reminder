@@ -24,7 +24,7 @@ struct TelemetryConfiguration {
 struct TelemetryEvent: Codable, Equatable {
     let name: String
     let value: Int
-    var kind: String? = nil
+    var kind: String?
 }
 
 /// The `/v1/events` request body.
