@@ -70,6 +70,76 @@ final class SchedulerTests: XCTestCase {
         XCTAssertTrue(fired.isEmpty)
     }
 
+    func test_noFireWhileAsleep() async throws {
+        // Arrange
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+
+        // Act
+        await scheduler.setAsleep(true)
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(0.02))], authoritativeFor: ["acct1"])
+        await scheduler.waitForPendingFires()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Assert — dropped, not queued for later: the Mac being asleep means the plane is stale
+        let fired = await spy.firedIds
+        XCTAssertTrue(fired.isEmpty)
+    }
+
+    func test_noFireWhileLocked() async throws {
+        // Arrange
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+
+        // Act
+        await scheduler.setLocked(true)
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(0.02))], authoritativeFor: ["acct1"])
+        await scheduler.waitForPendingFires()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Assert
+        let fired = await spy.firedIds
+        XCTAssertTrue(fired.isEmpty)
+    }
+
+    func test_stillSuppressedIfOnlyOneOfAsleepOrLockedClears() async throws {
+        // Arrange — a Mac can wake with the screen still locked (password not yet entered);
+        // firing must wait for both to clear, not just the one that happened to
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        await scheduler.setAsleep(true)
+        await scheduler.setLocked(true)
+
+        // Act
+        await scheduler.setAsleep(false)
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(0.02))], authoritativeFor: ["acct1"])
+        await scheduler.waitForPendingFires()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Assert
+        let fired = await spy.firedIds
+        XCTAssertTrue(fired.isEmpty)
+    }
+
+    func test_firesNormallyOnceBothAsleepAndLockedClear() async throws {
+        // Arrange
+        let spy = FireSpy()
+        let scheduler = makeScheduler(spy: spy)
+        await scheduler.setAsleep(true)
+        await scheduler.setLocked(true)
+
+        // Act
+        await scheduler.setAsleep(false)
+        await scheduler.setLocked(false)
+        await scheduler.reconcile([trigger(id: "evt1#5", fireDate: Date().addingTimeInterval(0.02))], authoritativeFor: ["acct1"])
+        await scheduler.waitForPendingFires()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Assert
+        let fired = await spy.firedIds
+        XCTAssertEqual(fired, ["evt1#5"])
+    }
+
     func test_pastDueTriggersAreNeverArmed() async {
         // Arrange
         let spy = FireSpy()

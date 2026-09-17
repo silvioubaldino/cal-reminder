@@ -56,6 +56,8 @@ private final class FakeAccountsManaging: AccountsManaging {
 private final class FakeScheduler: Scheduling {
     private(set) var reconcileCalls: [(triggers: [Trigger], accountIds: Set<String>)] = []
     private(set) var enabledCalls: [Bool] = []
+    private(set) var asleepCalls: [Bool] = []
+    private(set) var lockedCalls: [Bool] = []
     private(set) var cancelledAccountIds: [String] = []
     private(set) var rearmAllCallCount = 0
     private var armed: [String: Trigger] = [:]
@@ -76,6 +78,14 @@ private final class FakeScheduler: Scheduling {
 
     func setEnabled(_ enabled: Bool) async {
         enabledCalls.append(enabled)
+    }
+
+    func setAsleep(_ asleep: Bool) async {
+        asleepCalls.append(asleep)
+    }
+
+    func setLocked(_ locked: Bool) async {
+        lockedCalls.append(locked)
     }
 
     func cancel(accountId: String) async {
@@ -235,6 +245,41 @@ final class AppCoordinatorTests: XCTestCase {
         await coordinator.handleWake()
 
         XCTAssertTrue(onWakeCalled)
+    }
+
+    func test_wakeClearsAsleepBeforeRearming() async {
+        // A Trigger that went past-due while asleep must stay dropped, never fired late — the
+        // Scheduler must be told the Mac is awake before it recomputes anything (TDR-026).
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+
+        await coordinator.handleWake()
+
+        XCTAssertEqual(scheduler.asleepCalls, [false])
+    }
+
+    func test_startObservesSleepAndSuppressesFiringBeforeTheTransition() async throws {
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+
+        coordinator.start()
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(scheduler.asleepCalls, [true])
+    }
+
+    func test_startObservesScreenLockAndSuppressesFiring() async throws {
+        let scheduler = FakeScheduler()
+        let coordinator = makeCoordinator(scheduler: scheduler)
+
+        coordinator.start()
+        DistributedNotificationCenter.default().post(name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        DistributedNotificationCenter.default().post(name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(scheduler.lockedCalls, [true, false])
     }
 
     func test_testAnimationCallsOnTestAnimation() {

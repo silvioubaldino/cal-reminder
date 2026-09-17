@@ -41,6 +41,16 @@ final class AppCoordinator {
 
     func start() {
         pollLoop.start()
+        // Set *before* the transition happens, so a Trigger whose timer elapses only once the
+        // Mac is already asleep (or already resuming from it) is dropped rather than racing
+        // handleWake()'s rearmAll() (TDR-026).
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { await self?.scheduler.setAsleep(true) }
+        }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
@@ -48,7 +58,24 @@ final class AppCoordinator {
         ) { [weak self] _ in
             Task { @MainActor in await self?.handleWake() }
         }
+        DistributedNotificationCenter.default().addObserver(
+            forName: Self.screenIsLockedNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { await self?.scheduler.setLocked(true) }
+        }
+        DistributedNotificationCenter.default().addObserver(
+            forName: Self.screenIsUnlockedNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { await self?.scheduler.setLocked(false) }
+        }
     }
+
+    private static let screenIsLockedNotification = NSNotification.Name("com.apple.screenIsLocked")
+    private static let screenIsUnlockedNotification = NSNotification.Name("com.apple.screenIsUnlocked")
 
     func setOAuthConfigured(_ configured: Bool) {
         state.oauthConfigured = configured
@@ -122,6 +149,7 @@ final class AppCoordinator {
 
     func handleWake() async {
         onWake?()
+        await scheduler.setAsleep(false)
         await scheduler.rearmAll()
         await poll()
     }
