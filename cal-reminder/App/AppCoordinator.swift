@@ -12,6 +12,7 @@ final class AppCoordinator {
     private(set) var state = AppState()
     var onStateChange: ((AppState) -> Void)?
     var onWake: (() -> Void)?
+    var onTestAnimation: (() -> Void)?
 
     init(
         accounts: AccountsManaging,
@@ -103,8 +104,10 @@ final class AppCoordinator {
             startDate: now.addingTimeInterval(5 * 60),
             fireDate: now,
             minutesBefore: 5,
-            accountId: "test"
+            accountId: "test",
+            origin: .testAnimation
         )
+        onTestAnimation?()
         Task { await overlay.enqueue(trigger) }
     }
 

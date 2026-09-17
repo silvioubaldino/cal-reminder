@@ -146,21 +146,22 @@ final class CalendarService: CalendarServicing {
                     continue
                 }
 
-                let minutesList = ReminderResolver.popupReminderMinutes(
+                let resolvedReminders = ReminderResolver.popupReminders(
                     for: event,
                     calendarDefaults: defaults,
                     settings: reminderSettings
                 )
-                print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
-                for minutes in minutesList {
+                print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(resolvedReminders.map(\.minutes))")
+                for resolved in resolvedReminders {
                     triggers.append(Trigger(
-                        id: "\(accountId)#\(calendarId)#\(eventId)#\(minutes)",
+                        id: "\(accountId)#\(calendarId)#\(eventId)#\(resolved.minutes)",
                         eventTitle: event.summary ?? "",
                         startDate: startDate,
-                        fireDate: startDate.addingTimeInterval(-Double(minutes) * 60),
-                        minutesBefore: minutes,
+                        fireDate: startDate.addingTimeInterval(-Double(resolved.minutes) * 60),
+                        minutesBefore: resolved.minutes,
                         calendarColorHex: colorsById[calendarId] ?? nil,
-                        accountId: accountId
+                        accountId: accountId,
+                        origin: resolved.origin
                     ))
                 }
             }

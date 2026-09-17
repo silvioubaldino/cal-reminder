@@ -230,6 +230,57 @@ final class ReminderResolverTests: XCTestCase {
         XCTAssertTrue(minutes.isEmpty)
     }
 
+    // MARK: - popupReminders: origin tagging
+
+    func test_popupReminders_tagsTheInheritedMinuteAsEventReminder() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 10)])
+
+        // Act
+        let reminders = ReminderResolver.popupReminders(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: true, extraMinutes: [1])
+        )
+
+        // Assert
+        XCTAssertEqual(reminders, [
+            .init(minutes: 10, origin: .eventReminder),
+            .init(minutes: 1, origin: .extraReminder)
+        ])
+    }
+
+    func test_popupReminders_collidingMinute_isTaggedAsEventReminder() {
+        // Arrange — RN-07: an Extra Reminder that matches the Event's own minute still fires
+        // once; it's attributed to the Event since it would fire with or without the Extra one.
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 5)])
+
+        // Act
+        let reminders = ReminderResolver.popupReminders(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: true, extraMinutes: [5])
+        )
+
+        // Assert
+        XCTAssertEqual(reminders, [.init(minutes: 5, origin: .eventReminder)])
+    }
+
+    func test_popupReminders_inheritOff_tagsEverythingAsExtraReminder() {
+        // Arrange
+        let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 30)])
+
+        // Act
+        let reminders = ReminderResolver.popupReminders(
+            for: event,
+            calendarDefaults: [],
+            settings: ReminderSettings(inheritEventReminders: false, extraMinutes: [1])
+        )
+
+        // Assert
+        XCTAssertEqual(reminders, [.init(minutes: 1, origin: .extraReminder)])
+    }
+
     func test_extraRemindersAreOrderedAscending_afterTheInheritedOnes() {
         // Arrange
         let event = event(useDefault: false, overrides: [.init(method: "popup", minutes: 10)])

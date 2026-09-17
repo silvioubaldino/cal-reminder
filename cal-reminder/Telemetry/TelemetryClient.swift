@@ -1,5 +1,21 @@
 import Foundation
 
+/// Serializes flushes: the pending batch is cleared only after a 202, so two overlapping
+/// sends would report the same events twice.
+private actor FlushGate {
+    private var last: Task<Void, Never>?
+
+    func enqueue(_ work: @escaping () async -> Void) -> Task<Void, Never> {
+        let previous = last
+        let task = Task {
+            await previous?.value
+            await work()
+        }
+        last = task
+        return task
+    }
+}
+
 final class TelemetryClient: TelemetryReporting {
     let isConfigured = true
 
@@ -12,6 +28,8 @@ final class TelemetryClient: TelemetryReporting {
     private let macosMajor: () -> String
     private let sendInterval: TimeInterval
     private var timer: Timer?
+    private let flushGate = FlushGate()
+    private var pendingSend: Task<Void, Never>?
 
     init(
         configuration: TelemetryConfiguration,
@@ -54,11 +72,26 @@ final class TelemetryClient: TelemetryReporting {
         }
     }
 
-    func recordPlaneFlown() {
+    /// Sent as it happens, so the counter lands on the hour the Airplane actually flew rather
+    /// than on the hour the batch happened to be sent. A failed send leaves the event pending
+    /// for the next flush, which is then reported late.
+    func recordPlaneFlown(origin: TriggerOrigin) {
         guard isEnabled else { return }
         var batch = settingsStore.pendingBatch
-        batch.planesFlown += 1
+        batch.planesFlown[origin.rawValue, default: 0] += 1
         settingsStore.pendingBatch = batch
+
+        let previous = pendingSend
+        pendingSend = Task { [weak self] in
+            await previous?.value
+            await self?.flush()
+        }
+    }
+
+    /// Test-only hook (mirrors `Scheduler.waitForPendingFires()`): awaits the sends the
+    /// recorded flights kicked off, so tests don't race them.
+    func waitForPendingSends() async {
+        await pendingSend?.value
     }
 
     func recordActiveToday() {
@@ -90,6 +123,10 @@ final class TelemetryClient: TelemetryReporting {
     }
 
     func flush() async {
+        await flushGate.enqueue { [weak self] in await self?.send() }.value
+    }
+
+    private func send() async {
         guard isEnabled else { return }
         let batch = settingsStore.pendingBatch
         guard !batch.isEmpty else { return }

@@ -152,6 +152,31 @@ final class CalendarServiceTests: XCTestCase {
             triggers.first { $0.minutesBefore == 1 }?.fireDate,
             start.addingTimeInterval(-60)
         )
+        XCTAssertEqual(triggers.first { $0.minutesBefore == 10 }?.origin, .eventReminder)
+        XCTAssertEqual(triggers.first { $0.minutesBefore == 1 }?.origin, .extraReminder)
+    }
+
+    func test_extraReminderCollidingWithTheEventsOwnMinute_isTaggedAsTheEventReminder() async throws {
+        // Arrange — the Extra Reminder (5 min) matches the Event's own popup Reminder (RN-07):
+        // it still fires once, and is attributed to the Event since it would fire regardless.
+        let api = StubGoogleCalendarAPI()
+        let start = fixedNow.addingTimeInterval(3600)
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: start)]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 5)]
+        let service = CalendarService(
+            api: api,
+            accountId: "acct1",
+            selectionStore: StubCalendarSelectionStore(),
+            reminderSettingsStore: StubReminderSettingsStore(ReminderSettings(inheritEventReminders: true, extraMinutes: [5])),
+            clock: { self.fixedNow }
+        )
+
+        // Act
+        let triggers = try await service.poll()
+
+        // Assert
+        XCTAssertEqual(triggers.count, 1)
+        XCTAssertEqual(triggers.first?.origin, .eventReminder)
     }
 
     func test_noReminderSelectedProducesNoTriggerAtAll() async throws {

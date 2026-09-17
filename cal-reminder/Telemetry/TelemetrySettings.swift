@@ -1,18 +1,21 @@
 import Foundation
 
 struct TelemetryPendingBatch: Codable, Equatable {
-    var planesFlown: Int = 0
+    /// Count of Reminder animations played, per `TriggerOrigin` raw value. A dictionary, not a
+    /// single count, because a failed send can leave flights of different origins pending at
+    /// the same time.
+    var planesFlown: [String: Int] = [:]
     var dailyActiveQueued: Bool = false
     var installationKind: String?
 
     var isEmpty: Bool {
-        planesFlown == 0 && !dailyActiveQueued && installationKind == nil
+        planesFlown.isEmpty && !dailyActiveQueued && installationKind == nil
     }
 
     var events: [TelemetryEvent] {
         var events: [TelemetryEvent] = []
-        if planesFlown > 0 {
-            events.append(TelemetryEvent(name: "planes_flown", value: planesFlown))
+        for origin in planesFlown.keys.sorted() where planesFlown[origin]! > 0 {
+            events.append(TelemetryEvent(name: "planes_flown", value: planesFlown[origin]!, kind: origin))
         }
         if dailyActiveQueued {
             events.append(TelemetryEvent(name: "daily_active", value: 1))

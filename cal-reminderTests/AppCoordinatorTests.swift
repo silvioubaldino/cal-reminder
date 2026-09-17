@@ -237,6 +237,16 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(onWakeCalled)
     }
 
+    func test_testAnimationCallsOnTestAnimation() {
+        let coordinator = makeCoordinator()
+        var testAnimationCalled = false
+        coordinator.onTestAnimation = { testAnimationCalled = true }
+
+        coordinator.testAnimation()
+
+        XCTAssertTrue(testAnimationCalled)
+    }
+
     func test_calendarsChangedRebuildsTriggersWithAFullResync() async throws {
         let accounts = FakeAccountsManaging()
         let upcoming = trigger(id: "evt1#5", minutesFromNow: 5)

@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
--
+- Reminder animations now report which Reminder flew them — the Event's own, an Extra Reminder, or the menu bar's test — so the dashboard can tell them apart (TDR-025).
 
 ## Release - v0.4.0 - 20-09-2026
 

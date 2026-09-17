@@ -104,22 +104,70 @@ final class TelemetryClientTests: XCTestCase {
 
     // MARK: recordPlaneFlown / flush
 
-    func test_recordPlaneFlown_accumulatesAndSendsAsOneBatch() async {
+    func test_recordPlaneFlown_sendsWithoutWaitingForTheTimer() async {
         // Arrange
         let http = StubHTTPClient()
-        let client = makeClient(httpClient: http)
+        let store = FakeTelemetrySettingsStore()
+        let client = makeClient(httpClient: http, settingsStore: store)
 
         // Act
-        client.recordPlaneFlown()
-        client.recordPlaneFlown()
-        client.recordPlaneFlown()
-        await client.flush()
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
 
         // Assert
         let sent = await http.sentRequests
         XCTAssertEqual(sent.count, 1)
-        let batch = try! decode(sent[0])
-        XCTAssertEqual(batch.events, [TelemetryEvent(name: "planes_flown", value: 3)])
+        XCTAssertEqual(
+            try! decode(sent[0]).events,
+            [TelemetryEvent(name: "planes_flown", value: 1, kind: "event_reminder")]
+        )
+        XCTAssertTrue(store.pendingBatch.isEmpty)
+    }
+
+    func test_consecutiveFlights_areNeverReportedTwice() async {
+        // Arrange
+        let http = StubHTTPClient()
+        let store = FakeTelemetrySettingsStore()
+        let client = makeClient(httpClient: http, settingsStore: store)
+
+        // Act
+        client.recordPlaneFlown(origin: .eventReminder)
+        client.recordPlaneFlown(origin: .eventReminder)
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
+
+        // Assert
+        let flown = await http.sentRequests
+            .compactMap { try? decode($0) }
+            .flatMap(\.events)
+            .filter { $0.name == "planes_flown" }
+            .reduce(0) { $0 + $1.value }
+        XCTAssertEqual(flown, 3)
+        XCTAssertTrue(store.pendingBatch.isEmpty)
+    }
+
+    func test_flightsOfDifferentOrigins_areReportedAsSeparateKindedEvents() async {
+        // Arrange
+        let http = StubHTTPClient()
+        let store = FakeTelemetrySettingsStore()
+        let client = makeClient(httpClient: http, settingsStore: store)
+
+        // Act
+        client.recordPlaneFlown(origin: .eventReminder)
+        client.recordPlaneFlown(origin: .extraReminder)
+        client.recordPlaneFlown(origin: .testAnimation)
+        await client.waitForPendingSends()
+
+        // Assert
+        let events = await http.sentRequests.compactMap { try? decode($0) }.flatMap(\.events)
+        let planesFlownByKind = Dictionary(uniqueKeysWithValues: events
+            .filter { $0.name == "planes_flown" }
+            .compactMap { event -> (String, Int)? in
+                guard let kind = event.kind else { return nil }
+                return (kind, event.value)
+            })
+        XCTAssertEqual(planesFlownByKind, ["event_reminder": 1, "extra_reminder": 1, "test_animation": 1])
+        XCTAssertTrue(store.pendingBatch.isEmpty)
     }
 
     func test_flush_withNothingPending_sendsNothing() async {
@@ -141,7 +189,7 @@ final class TelemetryClientTests: XCTestCase {
         let client = makeClient(httpClient: http)
 
         // Act
-        client.recordPlaneFlown()
+        client.recordActiveToday()
         await client.flush()
 
         // Assert
@@ -223,18 +271,20 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertTrue(store.pendingBatch.isEmpty)
     }
 
-    func test_animationAndDailyActive_recordedTogether_flushInOneBatch() async {
+    func test_aFlightCarriesThePendingDailyActive_inTheSameBatch() async {
         // Arrange
         let http = StubHTTPClient()
         let client = makeClient(httpClient: http)
+        client.recordActiveToday()
 
         // Act
-        client.recordPlaneFlown()
-        client.recordActiveToday()
-        await client.flush()
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
 
         // Assert
-        let events = Set(try! decode(await http.sentRequests[0]).events.map(\.name))
+        let sent = await http.sentRequests
+        XCTAssertEqual(sent.count, 1)
+        let events = Set(try! decode(sent[0]).events.map(\.name))
         XCTAssertEqual(events, ["planes_flown", "daily_active"])
     }
 
@@ -297,19 +347,23 @@ final class TelemetryClientTests: XCTestCase {
         let http = StubHTTPClient(mode: .networkFailure)
         let store = FakeTelemetrySettingsStore()
         let client = makeClient(httpClient: http, settingsStore: store)
-        client.recordPlaneFlown()
-        client.recordPlaneFlown()
-        await client.flush()
+        client.recordPlaneFlown(origin: .eventReminder)
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
+        XCTAssertEqual(store.pendingBatch.planesFlown["event_reminder"], 2)
 
         // Act
         await http.setMode(.accepted)
-        client.recordPlaneFlown()
-        await client.flush()
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
 
         // Assert
         let sent = await http.sentRequests
-        XCTAssertEqual(sent.count, 2)
-        XCTAssertEqual(try! decode(sent[1]).events, [TelemetryEvent(name: "planes_flown", value: 3)])
+        XCTAssertEqual(
+            try! decode(sent[sent.count - 1]).events,
+            [TelemetryEvent(name: "planes_flown", value: 3, kind: "event_reminder")]
+        )
+        XCTAssertTrue(store.pendingBatch.isEmpty)
     }
 
     func test_pendingBatch_clearedOnlyOnAcceptance() async {
@@ -317,10 +371,10 @@ final class TelemetryClientTests: XCTestCase {
         let http = StubHTTPClient(mode: .rejected(status: 500))
         let store = FakeTelemetrySettingsStore()
         let client = makeClient(httpClient: http, settingsStore: store)
-        client.recordPlaneFlown()
 
         // Act
-        await client.flush()
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
 
         // Assert
         XCTAssertFalse(store.pendingBatch.isEmpty)
@@ -328,11 +382,12 @@ final class TelemetryClientTests: XCTestCase {
 
     // MARK: the switch
 
-    func test_disablingTelemetry_discardsThePendingBatch() {
+    func test_disablingTelemetry_discardsThePendingBatch() async {
         // Arrange
         let store = FakeTelemetrySettingsStore()
-        let client = makeClient(settingsStore: store)
-        client.recordPlaneFlown()
+        let client = makeClient(httpClient: StubHTTPClient(mode: .networkFailure), settingsStore: store)
+        client.recordPlaneFlown(origin: .eventReminder)
+        await client.waitForPendingSends()
         XCTAssertFalse(store.pendingBatch.isEmpty)
 
         // Act
@@ -350,7 +405,7 @@ final class TelemetryClientTests: XCTestCase {
         client.isEnabled = false
 
         // Act
-        client.recordPlaneFlown()
+        client.recordPlaneFlown(origin: .eventReminder)
         client.recordActiveToday()
         client.recordInstallationIfChanged()
         await client.flush()
