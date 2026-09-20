@@ -151,7 +151,8 @@ final class CalendarService: CalendarServicing {
                     calendarDefaults: defaults,
                     settings: reminderSettings
                 )
-                print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(resolvedReminders.map(\.minutes))")
+                let minutesList = resolvedReminders.map(\.minutes)
+                print("[poll] event '\(event.summary ?? "")' start=\(startDate) useDefault=\(String(describing: event.reminders?.useDefault)) overrides=\(String(describing: event.reminders?.overrides)) → popup minutes=\(minutesList)")
                 for resolved in resolvedReminders {
                     triggers.append(Trigger(
                         id: "\(accountId)#\(calendarId)#\(eventId)#\(resolved.minutes)",

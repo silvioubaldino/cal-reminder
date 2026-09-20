@@ -56,40 +56,40 @@ private final class StubCalendarSelectionStore: CalendarSelectionStoring {
     }
 }
 
+private let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
+
+private func timedEvent(
+    id: String,
+    title: String,
+    startDate: Date,
+    useDefault: Bool = true,
+    overrides: [GoogleEvent.ReminderOverride]? = nil
+) -> GoogleEvent {
+    let formatter = ISO8601DateFormatter()
+    return GoogleEvent(
+        id: id,
+        summary: title,
+        start: .init(dateTime: formatter.string(from: startDate), date: nil),
+        status: "confirmed",
+        reminders: .init(useDefault: useDefault, overrides: overrides)
+    )
+}
+
+private func allDayEvent(id: String) -> GoogleEvent {
+    GoogleEvent(
+        id: id,
+        summary: "Holiday",
+        start: .init(dateTime: nil, date: "2027-01-16"),
+        status: "confirmed",
+        reminders: nil
+    )
+}
+
+private func cancelledEvent(id: String) -> GoogleEvent {
+    GoogleEvent(id: id, summary: nil, start: nil, status: "cancelled", reminders: nil)
+}
+
 final class CalendarServiceTests: XCTestCase {
-    private let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
-
-    private func timedEvent(
-        id: String,
-        title: String,
-        startDate: Date,
-        useDefault: Bool = true,
-        overrides: [GoogleEvent.ReminderOverride]? = nil
-    ) -> GoogleEvent {
-        let formatter = ISO8601DateFormatter()
-        return GoogleEvent(
-            id: id,
-            summary: title,
-            start: .init(dateTime: formatter.string(from: startDate), date: nil),
-            status: "confirmed",
-            reminders: .init(useDefault: useDefault, overrides: overrides)
-        )
-    }
-
-    private func allDayEvent(id: String) -> GoogleEvent {
-        GoogleEvent(
-            id: id,
-            summary: "Holiday",
-            start: .init(dateTime: nil, date: "2027-01-16"),
-            status: "confirmed",
-            reminders: nil
-        )
-    }
-
-    private func cancelledEvent(id: String) -> GoogleEvent {
-        GoogleEvent(id: id, summary: nil, start: nil, status: "cancelled", reminders: nil)
-    }
-
     func test_onlyTimedEventsProduceTriggers() async throws {
         let api = StubGoogleCalendarAPI()
         api.events["primary"] = [
@@ -97,7 +97,7 @@ final class CalendarServiceTests: XCTestCase {
             allDayEvent(id: "evt-allday")
         ]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -119,64 +119,13 @@ final class CalendarServiceTests: XCTestCase {
             )
         ]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 15)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
         XCTAssertTrue(triggers.contains { $0.id == "acct1#primary#evt-default#15" })
         XCTAssertTrue(triggers.contains { $0.id == "acct1#primary#evt-override#5" })
         XCTAssertFalse(triggers.contains { $0.id == "acct1#primary#evt-override#60" })
-    }
-
-    func test_extraReminderProducesItsOwnTriggerAlongsideTheEventsOwn() async throws {
-        // Arrange — "1 minute before" checked on top of the Event's own 10-minute Reminder (RF-15)
-        let api = StubGoogleCalendarAPI()
-        let start = fixedNow.addingTimeInterval(3600)
-        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: start)]
-        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(
-            api: api,
-            accountId: "acct1",
-            selectionStore: StubCalendarSelectionStore(),
-            reminderSettingsStore: StubReminderSettingsStore(ReminderSettings(inheritEventReminders: true, extraMinutes: [1])),
-            clock: { self.fixedNow }
-        )
-
-        // Act
-        let triggers = try await service.poll()
-
-        // Assert — distinct dedupe ids (RN-03), each firing at its own offset
-        XCTAssertEqual(triggers.count, 2)
-        XCTAssertEqual(Set(triggers.map(\.id)), ["acct1#primary#evt1#10", "acct1#primary#evt1#1"])
-        XCTAssertEqual(
-            triggers.first { $0.minutesBefore == 1 }?.fireDate,
-            start.addingTimeInterval(-60)
-        )
-        XCTAssertEqual(triggers.first { $0.minutesBefore == 10 }?.origin, .eventReminder)
-        XCTAssertEqual(triggers.first { $0.minutesBefore == 1 }?.origin, .extraReminder)
-    }
-
-    func test_extraReminderCollidingWithTheEventsOwnMinute_isTaggedAsTheEventReminder() async throws {
-        // Arrange — the Extra Reminder (5 min) matches the Event's own popup Reminder (RN-07):
-        // it still fires once, and is attributed to the Event since it would fire regardless.
-        let api = StubGoogleCalendarAPI()
-        let start = fixedNow.addingTimeInterval(3600)
-        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: start)]
-        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 5)]
-        let service = CalendarService(
-            api: api,
-            accountId: "acct1",
-            selectionStore: StubCalendarSelectionStore(),
-            reminderSettingsStore: StubReminderSettingsStore(ReminderSettings(inheritEventReminders: true, extraMinutes: [5])),
-            clock: { self.fixedNow }
-        )
-
-        // Act
-        let triggers = try await service.poll()
-
-        // Assert
-        XCTAssertEqual(triggers.count, 1)
-        XCTAssertEqual(triggers.first?.origin, .eventReminder)
     }
 
     func test_noReminderSelectedProducesNoTriggerAtAll() async throws {
@@ -191,7 +140,7 @@ final class CalendarServiceTests: XCTestCase {
             accountId: "acct1",
             selectionStore: StubCalendarSelectionStore(),
             reminderSettingsStore: StubReminderSettingsStore(ReminderSettings(inheritEventReminders: false, extraMinutes: [])),
-            clock: { self.fixedNow }
+            clock: { fixedNow }
         )
 
         // Act
@@ -213,7 +162,7 @@ final class CalendarServiceTests: XCTestCase {
                 overrides: [.init(method: "popup", minutes: 10), .init(method: "popup", minutes: 2)]
             )
         ]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -228,7 +177,7 @@ final class CalendarServiceTests: XCTestCase {
     func test_usesSyncTokenOnSubsequentPolls() async throws {
         let api = StubGoogleCalendarAPI()
         api.nextSyncTokens["primary"] = "token-abc"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         _ = try await service.poll()
         _ = try await service.poll()
@@ -239,7 +188,7 @@ final class CalendarServiceTests: XCTestCase {
     func test_fullResyncPollDropsTheStoredSyncToken() async throws {
         let api = StubGoogleCalendarAPI()
         api.nextSyncTokens["primary"] = "token-abc"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         _ = try await service.poll()
         _ = try await service.poll(fullResync: true)
@@ -253,7 +202,7 @@ final class CalendarServiceTests: XCTestCase {
         let api = StubGoogleCalendarAPI()
         api.events["primary"] = [cancelledEvent(id: "evt-gone")]
         api.nextSyncTokens["primary"] = "token-after-delta"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         // Act
         let triggers = try await service.poll()
@@ -270,7 +219,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(3600))]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.nextSyncTokens["primary"] = "token-1"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
         let firstPoll = try await service.poll()
         XCTAssertEqual(firstPoll.map(\.id), ["acct1#primary#evt1#10"])
 
@@ -288,7 +237,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(3600))]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.nextSyncTokens["primary"] = "token-1"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
         let firstPoll = try await service.poll()
         XCTAssertEqual(firstPoll.map(\.id), ["acct1#primary#evt1#10"])
 
@@ -307,7 +256,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: firstStart)]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.nextSyncTokens["primary"] = "token-1"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
         _ = try await service.poll()
 
         // Act
@@ -354,7 +303,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
         let firstPoll = try await service.poll()
         XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
 
@@ -378,7 +327,7 @@ final class CalendarServiceTests: XCTestCase {
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         let selectionStore = StubCalendarSelectionStore(selectedCalendarIds: nil)
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: selectionStore, reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: selectionStore, reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
         let firstPoll = try await service.poll()
         XCTAssertEqual(Set(firstPoll.map(\.id)), ["acct1#A#evt-a#10", "acct1#B#evt-b#10"])
 
@@ -393,7 +342,7 @@ final class CalendarServiceTests: XCTestCase {
     func test_fullResyncKeepsTheCachedDefaultReminders() async throws {
         let api = StubGoogleCalendarAPI()
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
         _ = try await service.poll()
 
         api.defaultReminders.updateValue(nil, forKey: "primary")
@@ -406,7 +355,7 @@ final class CalendarServiceTests: XCTestCase {
     func test_remembersDefaultRemindersWhenResponseOmitsThem() async throws {
         let api = StubGoogleCalendarAPI()
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         _ = try await service.poll()
         api.defaultReminders.updateValue(nil, forKey: "primary")
@@ -426,7 +375,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -446,7 +395,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(selectedCalendarIds: nil), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(selectedCalendarIds: nil), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -464,7 +413,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["B"] = [timedEvent(id: "evt-b", title: "B event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(selectedCalendarIds: ["A"]), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(selectedCalendarIds: ["A"]), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -483,7 +432,7 @@ final class CalendarServiceTests: XCTestCase {
         api.events["B"] = [timedEvent(id: sharedEventId, title: "Shared", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
         api.defaultReminders["B"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -495,8 +444,8 @@ final class CalendarServiceTests: XCTestCase {
         let api = StubGoogleCalendarAPI()
         api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let serviceA = CalendarService(api: api, accountId: "acctA", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
-        let serviceB = CalendarService(api: api, accountId: "acctB", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let serviceA = CalendarService(api: api, accountId: "acctA", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
+        let serviceB = CalendarService(api: api, accountId: "acctB", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggersA = try await serviceA.poll()
         let triggersB = try await serviceB.poll()
@@ -512,7 +461,7 @@ final class CalendarServiceTests: XCTestCase {
             GoogleCalendarListEntry(id: "B", summary: "B", primary: false, accessRole: "reader", backgroundColor: nil)
         ]
         api.nextSyncTokens["A"] = "token-a"
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         _ = try await service.poll()
         _ = try await service.poll()
@@ -529,7 +478,7 @@ final class CalendarServiceTests: XCTestCase {
         api.expireTokenOnce = ["A"]
         api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -547,7 +496,7 @@ final class CalendarServiceTests: XCTestCase {
         api.alwaysFail = ["broken"]
         api.events["A"] = [timedEvent(id: "evt-a", title: "A event", startDate: fixedNow.addingTimeInterval(600))]
         api.defaultReminders["A"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         let triggers = try await service.poll()
 
@@ -557,7 +506,7 @@ final class CalendarServiceTests: XCTestCase {
     func test_authRevokedErrorPropagatesOutOfPoll() async throws {
         let api = StubGoogleCalendarAPI()
         api.authRevokedFor = ["primary"]
-        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { self.fixedNow })
+        let service = CalendarService(api: api, accountId: "acct1", selectionStore: StubCalendarSelectionStore(), reminderSettingsStore: StubReminderSettingsStore(), clock: { fixedNow })
 
         do {
             _ = try await service.poll()
@@ -582,5 +531,58 @@ final class CalendarServiceTests: XCTestCase {
             CalendarInfo(id: "A", title: "A", isPrimary: true),
             CalendarInfo(id: "B", title: "B", isPrimary: false)
         ])
+    }
+}
+
+final class CalendarServiceTriggerOriginTests: XCTestCase {
+    func test_extraReminderProducesItsOwnTriggerAlongsideTheEventsOwn() async throws {
+        // Arrange — "1 minute before" checked on top of the Event's own 10-minute Reminder (RF-15)
+        let api = StubGoogleCalendarAPI()
+        let start = fixedNow.addingTimeInterval(3600)
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: start)]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 10)]
+        let service = CalendarService(
+            api: api,
+            accountId: "acct1",
+            selectionStore: StubCalendarSelectionStore(),
+            reminderSettingsStore: StubReminderSettingsStore(ReminderSettings(inheritEventReminders: true, extraMinutes: [1])),
+            clock: { fixedNow }
+        )
+
+        // Act
+        let triggers = try await service.poll()
+
+        // Assert — distinct dedupe ids (RN-03), each firing at its own offset
+        XCTAssertEqual(triggers.count, 2)
+        XCTAssertEqual(Set(triggers.map(\.id)), ["acct1#primary#evt1#10", "acct1#primary#evt1#1"])
+        XCTAssertEqual(
+            triggers.first { $0.minutesBefore == 1 }?.fireDate,
+            start.addingTimeInterval(-60)
+        )
+        XCTAssertEqual(triggers.first { $0.minutesBefore == 10 }?.origin, .eventReminder)
+        XCTAssertEqual(triggers.first { $0.minutesBefore == 1 }?.origin, .extraReminder)
+    }
+
+    func test_extraReminderCollidingWithTheEventsOwnMinute_isTaggedAsTheEventReminder() async throws {
+        // Arrange — the Extra Reminder (5 min) matches the Event's own popup Reminder (RN-07):
+        // it still fires once, and is attributed to the Event since it would fire regardless.
+        let api = StubGoogleCalendarAPI()
+        let start = fixedNow.addingTimeInterval(3600)
+        api.events["primary"] = [timedEvent(id: "evt1", title: "Standup", startDate: start)]
+        api.defaultReminders["primary"] = [GoogleCalendarDefaultReminder(method: "popup", minutes: 5)]
+        let service = CalendarService(
+            api: api,
+            accountId: "acct1",
+            selectionStore: StubCalendarSelectionStore(),
+            reminderSettingsStore: StubReminderSettingsStore(ReminderSettings(inheritEventReminders: true, extraMinutes: [5])),
+            clock: { fixedNow }
+        )
+
+        // Act
+        let triggers = try await service.poll()
+
+        // Assert
+        XCTAssertEqual(triggers.count, 1)
+        XCTAssertEqual(triggers.first?.origin, .eventReminder)
     }
 }
