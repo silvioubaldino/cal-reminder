@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+-
+
+## Release - v0.4.0 - 20-09-2026
+
 - Split the backend out into its own repository: this one is now the product's context repo as well as the macOS client, and the service keeps its own specification and technical decisions.
 - Designed how the project will see the app in the field: three anonymous counts the user can switch off, carrying no identifier at all, and a small stateless service of the project's own that receives them — a build made from the source contacts none of it.
 
