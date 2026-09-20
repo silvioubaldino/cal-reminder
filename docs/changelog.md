@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+
+## Release - v0.4.1 - 20-09-2026
+
 - Fixed: Reminders whose moment passed while the Mac was asleep, hibernating or with the screen locked are now dispensed with instead of piling up and flying all at once on wake (TDR-026).
 - Reminder animations now report which Reminder flew them — the Event's own, an Extra Reminder, or the menu bar's test — so the dashboard can tell them apart (TDR-025).
 
