@@ -96,6 +96,11 @@ jobs:
           # the app ships publicly (AYD-009); they are repository variables.
           SPARKLE_FEED_URL: ${{ vars.SPARKLE_FEED_URL }}
           SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+          # The Project Service endpoint is not secret either; the key is a lightweight,
+          # non-authenticating shared value (AYD-013) but is still a repository secret
+          # rather than a variable, matching how the OAuth client secret is handled.
+          TELEMETRY_ENDPOINT: ${{ vars.TELEMETRY_ENDPOINT }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
         run: scripts/release/build.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.build }}"
 
       - name: Notarize & staple the app

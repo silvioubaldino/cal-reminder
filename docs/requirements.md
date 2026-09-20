@@ -3,9 +3,9 @@ id: REQ-01
 type: requirements
 title: Requirements and glossary
 status: approved
-updated: 2026-09-10
+updated: 2026-09-16
 parents: []
-children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010, AYD-011]
+children: [AYD-001, AYD-004, AYD-006, AYD-007, AYD-008, AYD-009, AYD-010, AYD-011, AYD-013]
 related: [GLO]
 ---
 
@@ -28,7 +28,7 @@ related: [GLO]
 | RF-03 | Resolve each Event's effective popup Reminders | Must | For each Event, the app derives its Reminders from `overrides` or the calendar defaults, keeping only `popup` (RN-04) |
 | RF-04 | Fly the airplane + banner Overlay at each Reminder time | Must | At `Event start − Reminder minutes`, an airplane pulling a banner slides across the screen over all windows (RN-02) |
 | RF-05 | The banner shows the Event and time | Must | The banner text reads on two centered lines — `<Title>` in bold, then `at HH:MM (in X min)` in italic; the Banner keeps a fixed width, widening on demand for a long title rather than hiding it |
-| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including every connected Account's email), toggle the app on/off, test the animation, manage Accounts — add, reconnect, or sign out each one (RF-14) — choose the Airplane's Flight Speed, choose the Banner's color (preset or the Event's Calendar Color, RF-13), choose which Calendars to be alerted on per Account (RF-10), check for updates (RF-16), and quit |
+| RF-06 | Menu bar control | Must | From the menu bar the user can see connection status (including every connected Account's email), toggle the app on/off, test the animation, manage Accounts — add, reconnect, or sign out each one (RF-14) — choose the Airplane's Flight Speed, choose the Banner's color (preset or the Event's Calendar Color, RF-13), choose which Calendars to be alerted on per Account (RF-10), check for updates (RF-16), turn Telemetry off (RF-17), and quit |
 | RF-07 | Choose the Airplane's Flight Speed | Must | The menu bar offers 3 Flight Speed presets (Slow/Normal/Fast); the selection persists across restarts, applies from the next animation on, and the Airplane crosses any screen size at the same visual speed |
 | RF-08 | Choose the Banner's color | Must | The menu bar offers a set of Banner color presets; the selection persists across restarts and applies from the next animation on |
 | RF-09 | Skip a playing Reminder animation | Should | While the airplane + banner Overlay is flying, a click anywhere on the screen accelerates it to cover the remaining distance in ~1.5s instead of blocking the click through |
@@ -38,6 +38,8 @@ related: [GLO]
 | RF-14 | Connect more than one Google Account | Should | From the menu bar's "Accounts" submenu the user can connect additional Google Accounts (each authorized separately, RF-01), see each Account's connection status and email, choose that Account's Calendars (RF-10), reconnect it, or sign it out — independently of the other connected Accounts. Every connected Account's selected Calendars generate Triggers; one Account's connection failure doesn't affect the others (RNF-04) |
 | RF-15 | Choose which Reminders fire | Should | The menu bar offers a "Reminders" submenu where the user switches the Event's own Reminders on/off and checks any number of **Extra Reminders** from a fixed set (at start, 1, 5, 10, 15 minutes before); every Event's effective Reminders are the union of both (RN-07). The selection is app-wide, persists across restarts, and rebuilds the upcoming Triggers as soon as it changes — no waiting for the next Poll. The submenu also states the current selection, and warns when nothing is selected (no Event would ever be announced) |
 | RF-16 | Check for and install updates | Must | The app checks the Appcast for a newer Release on a schedule and on demand from the menu bar ("Check for updates…"), states the version it is running, shows what changed, and installs with the user's consent and a relaunch; an update whose signature does not verify is refused (RNF-11). The automatic check is opt-in on first launch and toggleable afterwards. Applies to the **Distributed Build** only — a **Source Build** never self-updates |
+| RF-17 | Report anonymous Telemetry | Should | The Distributed Build reports three counts to the Project Service and nothing else: Reminder animations played; one "used today" event per calendar day, raised on launch, on wake from sleep, on an animation, or on its own timer; and one event per installation, marked as a first install or an update. Each carries the app and macOS version, **no identifier of any kind**, and no Event, Calendar or Account content. The menu bar states that it reports and offers a switch to stop it; the first launch says so before the first report leaves the Mac. A **Source Build** reports nothing (RNF-13) |
+| RF-18 | Crash logs | Should | The project can see why the app crashed on a user's Mac. Planned; no design yet |
 
 ## Non-functional (RNF)
 | ID | Category | Requirement | Target |
@@ -53,7 +55,8 @@ related: [GLO]
 | RNF-09 | Quality gate | Every change is built, tested, and linted automatically | CI builds the app, runs the test suite, and lints the sources on each push/PR; a failure blocks the merge (AYD-004) |
 | RNF-10 | Security (app credential) | The **app's** OAuth client secret is not exposed | Two levels. **Now (must):** the secret is not in the repository at all — the source is public (RNF-12), so it is injected at build time and ships only in the Distributed Build (TDR-007). **Target:** the token exchange/refresh runs behind an app-owned backend (token broker) so the secret never ships in a binary either; auto-update (RF-16) makes rotating it a same-day operation instead of a reinstall (AYD-009) |
 | RNF-11 | Security (update channel) | An update can only come from the project | Every Release is EdDSA-signed and its Appcast served over HTTPS; the app refuses any update whose signature does not verify against the public key embedded in the binary, so control of the feed or of the download host is not enough to ship code to a user's machine. The private signing key exists only in a Keychain and as a CI secret, never in the repository (AYD-009, TDR-006) |
-| RNF-12 | Distribution model | Source-available, sold on trust | The repository builds and runs a **fully functional** app with no purchase, no license key, no feature gate, no trial timer and no phone-home; the builder supplies their own Google OAuth client (TDR-007). What a purchase buys is the Distributed Build's convenience — signed, notarized, credentials included, auto-updating — never a capability withheld from the source (AYD-009). The repository is licensed under PolyForm Shield 1.0.0 (`LICENSE.md`): free to clone, build and use for any purpose, but not to redistribute as a competing product |
+| RNF-12 | Distribution model | Source-available, sold on trust | The repository builds and runs the app with **every capability that exists in the source**: no purchase, no license key, no trial timer, and no call to a project-owned server that gates functionality. Any subscription lock the Distributed Build carries is visible in the source and removable by whoever builds it — what is sold is never a secret. The builder supplies their own Google OAuth client (TDR-007). What a purchase buys is the Distributed Build's convenience — signed, notarized, credentials included, auto-updating — and, once subscriptions ship, the entitlements it unlocks. The repository is licensed under PolyForm Shield 1.0.0 (`LICENSE.md`): free to clone, build and use for any purpose, but not to redistribute as a competing product |
+| RNF-13 | Observability | The project can tell how the app is doing in the field, without collecting anything about anyone | A dashboard shows Reminder animations played, Installs used each day by app and macOS version, and installations split into first installs and updates, with at least 12 months of history. Reports carry **no identifier** and no IP is retained, so nothing can be followed across reports. Daily counts are read one day at a time — summed over a longer window they are Install-days, not distinct Installs — and every count is a lower bound because Telemetry can be switched off; the dashboard states both. A build with **no** Project Service configuration makes **no** request to any project-owned server, covered by an automated test (AYD-013) |
 
 ## Business rules
 - RN-01: Only timed Events generate Triggers; all-day Events are ignored.
@@ -73,7 +76,7 @@ related: [GLO]
 
 ## MVP scope
 - **In:** Google OAuth connect (read-only, including each connected Account's email for display) with Keychain-stored tokens; connecting **more than one Google Account at the same time** (RF-14); reading timed Events from the selected Calendars of every connected Account; choosing which Calendars to be alerted on, per Account (RF-10); resolving popup Reminders; choosing which Reminders fire — the Event's own plus any Extra Reminders (RF-15); airplane + banner Overlay over all windows; menu bar control (status incl. connected emails, on/off, test, Accounts submenu — add/reconnect/sign out per Account, RF-14 — Flight Speed, Banner color, Calendar selection, Reminders, quit); queueing overlapping animations.
-- **Out (for now):** actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed, Banner color, and Calendar selection presets (e.g. custom colors, banner size); non-Google calendar sources (e.g. iCloud); all-day Events; multi-monitor targeting beyond the main screen.
+- **Out (for now):** subscriptions, entitlements and any paid feature lock; actions on the Event (open Meet/Zoom link); rich settings UI beyond Flight Speed, Banner color, and Calendar selection presets (e.g. custom colors, banner size); non-Google calendar sources (e.g. iCloud); all-day Events; multi-monitor targeting beyond the main screen.
 - **Out for good:** the Mac App Store, and with it App Sandbox as a *distribution* obligation, App Review, and store-managed updates (RNF-07, AYD-009).
 
 ## Post-MVP: shipping it (planned)
@@ -88,9 +91,11 @@ through the Mac App Store (RNF-07). Two user paths, one codebase:
 
 The remaining work sits in independent AYDs, each with a defined boundary: **AYD-009** (direct
 distribution, release pipeline & auto-update — RF-16, RNF-07, RNF-11, RNF-12), **AYD-010** (signing,
-sandbox and the compliance artifacts that survive outside the store — RNF-08), and **AYD-004** (CI &
-code-quality gate — RNF-09, already shipped). AYD-009 depends on the signing configuration AYD-010
-defines.
+sandbox and the compliance artifacts that survive outside the store — RNF-08), **AYD-004** (CI &
+code-quality gate — RNF-09, already shipped) and **AYD-013** (the Project Service and the
+observability it exists for — RF-17, RNF-13). AYD-009 depends on the signing configuration
+AYD-010 defines; AYD-013 depends on the build-time configuration TDR-007 introduced. RF-18 (crash
+logs) has no AYD yet.
 
 The **revoked direction.** RNF-07 previously targeted the Mac App Store (AYD-003, AYD-005). It is
 withdrawn, not deferred: the store forbids an app from updating itself, which is incompatible with
@@ -132,3 +137,6 @@ ambiguity turns into a bug.
 | Appcast | _The signed feed of Releases the app reads to learn whether a newer one exists (RF-16)._ | "update feed", "manifest" |
 | Distributed Build | _The Release the project itself builds, signs, notarizes and ships with its own Google OAuth credentials — the plug-and-play artifact a purchase buys (RNF-12), and the only build that self-updates._ | "official build", "paid version" |
 | Source Build | _An app built from the repository by anyone, with their own Google OAuth credentials (RNF-12). Fully functional and identical in features; unsigned by the project, so it never self-updates._ | "dev build", "free version", "community build" |
+| Install | _One copy of the app running on one Mac. It is the unit the project counts (RNF-13) — counted without ever being identified: the app reports at most one "used today" event per Install per day and the Project Service simply sums them._ | "user", "device", "seat" |
+| Project Service | _The project-owned backend a Distributed Build talks to: it receives Telemetry (RF-17), and later crash logs (RF-18) and subscription entitlements. A Source Build never contacts it._ | "API", "server", "backend" |
+| Telemetry | _What a Distributed Build reports to the Project Service: a batch of counter events — Reminder animations played, "used today", "installation" (first install or update) — labelled with the app and macOS version. No identifier, and never Event, Calendar or Account content._ | "analytics", "tracking", "metrics" |

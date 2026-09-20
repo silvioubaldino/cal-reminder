@@ -11,6 +11,7 @@ final class AppCoordinator {
 
     private(set) var state = AppState()
     var onStateChange: ((AppState) -> Void)?
+    var onWake: (() -> Void)?
 
     init(
         accounts: AccountsManaging,
@@ -117,6 +118,7 @@ final class AppCoordinator {
     }
 
     func handleWake() async {
+        onWake?()
         await scheduler.rearmAll()
         await poll()
     }

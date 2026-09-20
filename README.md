@@ -80,6 +80,19 @@ scripts/release/verify.sh build/export/cal-reminder.app build/cal-reminder-<vers
 `verify.sh` runs the same checks (`codesign --verify`, `spctl --assess`, `stapler validate`) the
 workflow uses as its publish gate.
 
+## Telemetry
+
+The Distributed Build reports a small number of anonymous counts to the project — Reminder
+animations played, whether the app was used that day, and whether it was a fresh install or an
+update — labelled only with the app and macOS version. **No identifier of any kind** is ever
+generated or sent, so no Install, Mac or person can be linked across reports. The menu bar
+states this and offers a switch to turn it off; a first-launch notice explains it before
+anything is sent.
+
+A **Source Build** never contacts the project's server at all — not for Telemetry, not for the
+update check — because it carries no configuration to do so. See `AYD-013` and `SPEC-023` in
+`docs/` for the full design and contract.
+
 ## Source Build vs Distributed Build
 
 | | Source Build | Distributed Build |
