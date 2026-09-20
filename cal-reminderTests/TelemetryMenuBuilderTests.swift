@@ -10,7 +10,7 @@ private final class FakeTelemetryReporting: TelemetryReporting {
         self.isEnabled = isEnabled
     }
 
-    func recordPlaneFlown() {}
+    func recordPlaneFlown(origin: TriggerOrigin) {}
     func recordActiveToday() {}
     func recordInstallationIfChanged() {}
 }

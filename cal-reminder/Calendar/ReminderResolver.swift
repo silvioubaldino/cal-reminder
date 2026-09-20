@@ -5,26 +5,45 @@ enum ReminderResolver {
     /// Fallback Reminder (RN-06) used when an Event resolves to no popup Reminder at all.
     static let defaultReminderMinutes = 5
 
-    /// Minutes-before values of the Event's **effective** Reminders (RN-07): the union of the
-    /// Event's own popup Reminders — honoring RN-04 (`useDefault` → calendar defaults; otherwise
-    /// → the Event's own overrides) and RN-06 (falls back to `defaultReminderMinutes` when that
-    /// set is empty), and only while `settings.inheritEventReminders` is on — with the Extra
-    /// Reminders the user checked (RF-15).
+    /// One minute-before value of an Event's effective Reminders, tagged with which branch of
+    /// RN-07's union produced it.
+    struct ResolvedReminder: Equatable {
+        let minutes: Int
+        let origin: TriggerOrigin
+    }
+
+    /// The Event's **effective** Reminders (RN-07): the union of the Event's own popup
+    /// Reminders — honoring RN-04 (`useDefault` → calendar defaults; otherwise → the Event's
+    /// own overrides) and RN-06 (falls back to `defaultReminderMinutes` when that set is empty),
+    /// and only while `settings.inheritEventReminders` is on — with the Extra Reminders the user
+    /// checked (RF-15).
     ///
     /// The inherited part keeps the API's order, so the default settings return exactly what the
     /// app returned before RF-15 existed. Extra Reminders follow, ascending, minus any minute the
-    /// inherited part already produced — a Reminder never fires twice for the same minute.
-    /// An empty result means the Event generates no Trigger at all.
+    /// inherited part already produced — a Reminder never fires twice for the same minute. A
+    /// minute produced by both branches is tagged `.eventReminder`: it would have fired with or
+    /// without the Extra Reminder. An empty result means the Event generates no Trigger at all.
+    static func popupReminders(
+        for event: GoogleEvent,
+        calendarDefaults: [GoogleCalendarDefaultReminder],
+        settings: ReminderSettings = .default
+    ) -> [ResolvedReminder] {
+        let inherited = settings.inheritEventReminders
+            ? inheritedPopupMinutes(for: event, calendarDefaults: calendarDefaults)
+            : []
+        let extra = settings.extraMinutes.subtracting(inherited).sorted()
+
+        return inherited.map { ResolvedReminder(minutes: $0, origin: .eventReminder) }
+            + extra.map { ResolvedReminder(minutes: $0, origin: .extraReminder) }
+    }
+
+    /// Minutes-before values only — see `popupReminders` for the origin-tagged version.
     static func popupReminderMinutes(
         for event: GoogleEvent,
         calendarDefaults: [GoogleCalendarDefaultReminder],
         settings: ReminderSettings = .default
     ) -> [Int] {
-        let inherited = settings.inheritEventReminders
-            ? inheritedPopupMinutes(for: event, calendarDefaults: calendarDefaults)
-            : []
-
-        return inherited + settings.extraMinutes.subtracting(inherited).sorted()
+        popupReminders(for: event, calendarDefaults: calendarDefaults, settings: settings).map(\.minutes)
     }
 
     /// The Event's own popup Reminders (RN-04) with RN-06's fallback applied.

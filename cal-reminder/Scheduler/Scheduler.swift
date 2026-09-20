@@ -5,6 +5,17 @@ import Foundation
 protocol Scheduling: AnyObject {
     func reconcile(_ triggers: [Trigger], authoritativeFor accountIds: Set<String>) async
     func setEnabled(_ enabled: Bool) async
+
+    /// Gates firing while the Mac is asleep, independently of `setLocked` — a Trigger whose
+    /// timer elapses while either is true is dropped, never queued (AYD-011 open question,
+    /// resolved by TDR-026). Must be set to `true` *before* the transition happens
+    /// (`willSleepNotification`), otherwise a Trigger already past-due at wake can fire before
+    /// `rearmAll()` gets a chance to cancel it.
+    func setAsleep(_ asleep: Bool) async
+
+    /// Gates firing while the screen is locked, independently of `setAsleep` — see its docs.
+    func setLocked(_ locked: Bool) async
+
     func cancel(accountId: String) async
     func rearmAll() async
 
@@ -26,6 +37,8 @@ actor Scheduler: Scheduling {
     private var armed: [String: Armed] = [:]
     private var firedIds: Set<String> = []
     private var enabled = true
+    private var isAsleep = false
+    private var isLocked = false
 
     init(clock: @escaping () -> Date = Date.init, onFire: @escaping (Trigger) -> Void) {
         self.clock = clock
@@ -55,6 +68,14 @@ actor Scheduler: Scheduling {
     /// `onFire` and don't mark the id as fired.
     func setEnabled(_ enabled: Bool) {
         self.enabled = enabled
+    }
+
+    func setAsleep(_ asleep: Bool) {
+        isAsleep = asleep
+    }
+
+    func setLocked(_ locked: Bool) {
+        isLocked = locked
     }
 
     func cancel(accountId: String) {
@@ -103,7 +124,7 @@ actor Scheduler: Scheduling {
 
     private func fire(_ trigger: Trigger) {
         armed.removeValue(forKey: trigger.id)
-        guard enabled else { return }
+        guard enabled, !isAsleep, !isLocked else { return }
         firedIds.insert(trigger.id)
         onFire(trigger)
     }

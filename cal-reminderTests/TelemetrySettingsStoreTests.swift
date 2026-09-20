@@ -33,7 +33,7 @@ final class TelemetrySettingsStoreTests: XCTestCase {
         let store = makeStore()
         let day = Date(timeIntervalSince1970: 1_700_000_000)
         var batch = TelemetryPendingBatch()
-        batch.planesFlown = 5
+        batch.planesFlown = ["event_reminder": 5]
         batch.dailyActiveQueued = true
         batch.installationKind = "update"
 
@@ -58,7 +58,7 @@ final class TelemetrySettingsStoreTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         let store = UserDefaultsTelemetrySettingsStore(defaults: defaults)
         var batch = TelemetryPendingBatch()
-        batch.planesFlown = 2
+        batch.planesFlown = ["event_reminder": 2]
 
         // Act
         store.enabled = false

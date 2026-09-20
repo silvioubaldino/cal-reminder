@@ -33,7 +33,7 @@ struct TelemetryBatchRequest: Encodable {
 protocol TelemetryReporting: AnyObject {
     var isConfigured: Bool { get }
     var isEnabled: Bool { get set }
-    func recordPlaneFlown()
+    func recordPlaneFlown(origin: TriggerOrigin)
     func recordActiveToday()
     func recordInstallationIfChanged()
 }

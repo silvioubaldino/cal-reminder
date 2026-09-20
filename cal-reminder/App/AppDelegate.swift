@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let accountRegistry = Self.makeAccountRegistry(reminderSettingsStore: reminderSettingsStore)
         let scheduler = Scheduler(onFire: { [telemetryClient] trigger in
-            telemetryClient?.recordPlaneFlown()
+            telemetryClient?.recordPlaneFlown(origin: trigger.origin)
             telemetryClient?.recordActiveToday()
             Task { await overlayPresenter.enqueue(trigger) }
         })
@@ -45,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         coordinator.onWake = { [telemetryClient] in
             telemetryClient?.recordActiveToday()
+        }
+        coordinator.onTestAnimation = { [telemetryClient] in
+            telemetryClient?.recordPlaneFlown(origin: .testAnimation)
         }
         self.coordinator = coordinator
 
